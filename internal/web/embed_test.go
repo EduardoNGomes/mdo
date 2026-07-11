@@ -21,7 +21,8 @@ func TestPageIncludesDocumentAndEmbeddedAssets(t *testing.T) {
 	for _, expected := range []string{
 		`README &lt;test&gt;.md`, `<h1 id="hello">Hello</h1>`,
 		`globalThis["mermaid"]`, `const token = "abc123"`,
-		`fetch(`,
+		`fetch(`, `enableDiagramZoom`, `Aumentar zoom`, `requestFullscreen`,
+		`Navegação do diagrama`, `Mover diagrama para a esquerda`,
 	} {
 		if !strings.Contains(html, expected) {
 			t.Errorf("Page() output does not contain %q", expected)
