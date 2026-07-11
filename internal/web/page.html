@@ -3,8 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="dark light">
   <title>{{.Title}} · mdo</title>
+  <script>
+    document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  </script>
   <style>{{.Styles}}</style>
 </head>
 <body>
@@ -18,7 +21,13 @@
       <strong>{{.Title}}</strong>
       <span title="{{.Path}}">{{.Path}}</span>
     </div>
-    <button class="toc-button" type="button" aria-expanded="false" aria-controls="toc">Sumário</button>
+    <div class="header-actions">
+      <button class="theme-button" type="button" aria-label="Ativar tema claro" title="Alternar tema">
+        <span class="theme-icon" aria-hidden="true">☀</span>
+        <span class="theme-label">Claro</span>
+      </button>
+      <button class="toc-button" type="button" aria-expanded="false" aria-controls="toc">Sumário</button>
+    </div>
   </header>
 
   <div class="layout" id="top">
@@ -41,6 +50,32 @@
       const toc = document.querySelector('.toc-nav');
       const tocShell = document.querySelector('.toc-shell');
       const tocButton = document.querySelector('.toc-button');
+      const themeButton = document.querySelector('.theme-button');
+      const themeIcon = themeButton.querySelector('.theme-icon');
+      const themeLabel = themeButton.querySelector('.theme-label');
+      let renderingMermaid = false;
+
+      function updateThemeButton() {
+        const light = document.documentElement.dataset.theme === 'light';
+        themeIcon.textContent = light ? '☾' : '☀';
+        themeLabel.textContent = light ? 'Escuro' : 'Claro';
+        themeButton.setAttribute('aria-label', light ? 'Ativar tema escuro' : 'Ativar tema claro');
+      }
+
+      async function setTheme(theme) {
+        document.documentElement.dataset.theme = theme;
+        updateThemeButton();
+        await rerenderMermaid();
+      }
+
+      themeButton.addEventListener('click', async () => {
+        if (renderingMermaid) return;
+        const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+        themeButton.disabled = true;
+        try { await setTheme(next); }
+        finally { themeButton.disabled = false; }
+      });
+      updateThemeButton();
 
       const slugCounts = new Map();
       const headings = article.querySelectorAll('h1, h2, h3');
@@ -234,25 +269,54 @@
           const container = code.closest('.highlight') || code.closest('pre');
           const diagram = document.createElement('pre');
           diagram.className = 'mermaid';
-          diagram.textContent = code.textContent;
+          diagram.dataset.mermaidSource = code.textContent;
+          diagram.textContent = diagram.dataset.mermaidSource;
           container.replaceWith(diagram);
         }
 
-        if (article.querySelector('.mermaid')) {
+        await renderMermaid();
+      }
+
+      async function renderMermaid() {
+        const diagrams = [...article.querySelectorAll('.mermaid')];
+        if (!diagrams.length || renderingMermaid) return;
+        renderingMermaid = true;
+        const light = document.documentElement.dataset.theme === 'light';
+        try {
           mermaid.initialize({
             startOnLoad: false,
             securityLevel: 'strict',
-            theme: 'dark',
+            theme: light ? 'neutral' : 'dark',
             fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
-            themeVariables: {
+            themeVariables: light ? {
+              primaryColor: '#e8fff4', primaryTextColor: '#0f172a',
+              primaryBorderColor: '#00a155', lineColor: '#475569',
+              secondaryColor: '#f1f5f9', tertiaryColor: '#ffffff'
+            } : {
               primaryColor: '#0b1927', primaryTextColor: '#f8fafc',
               primaryBorderColor: '#00dc82', lineColor: '#94a3b8',
               secondaryColor: '#111827', tertiaryColor: '#07111f'
             }
           });
-          await mermaid.run({ querySelector: '.mermaid', suppressErrors: false });
-          for (const diagram of article.querySelectorAll('.mermaid')) enableDiagramZoom(diagram);
+          await mermaid.run({ nodes: diagrams, suppressErrors: false });
+          for (const diagram of diagrams) enableDiagramZoom(diagram);
+        } finally {
+          renderingMermaid = false;
         }
+      }
+
+      async function rerenderMermaid() {
+        const shells = [...article.querySelectorAll('.diagram-shell')];
+        for (const shell of shells) {
+          const current = shell.querySelector('.mermaid');
+          if (!current) continue;
+          const diagram = document.createElement('pre');
+          diagram.className = 'mermaid';
+          diagram.dataset.mermaidSource = current.dataset.mermaidSource;
+          diagram.textContent = diagram.dataset.mermaidSource;
+          shell.replaceWith(diagram);
+        }
+        await renderMermaid();
       }
 
       window.addEventListener('load', async () => {

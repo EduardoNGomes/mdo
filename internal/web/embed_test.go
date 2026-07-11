@@ -23,6 +23,7 @@ func TestPageIncludesDocumentAndEmbeddedAssets(t *testing.T) {
 		`globalThis["mermaid"]`, `const token = "abc123"`,
 		`fetch(`, `enableDiagramZoom`, `Aumentar zoom`, `requestFullscreen`,
 		`Navegação do diagrama`, `Mover diagrama para a esquerda`,
+		`theme-button`, `prefers-color-scheme: light`, `rerenderMermaid`,
 	} {
 		if !strings.Contains(html, expected) {
 			t.Errorf("Page() output does not contain %q", expected)
