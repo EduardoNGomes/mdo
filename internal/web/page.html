@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>{{.Title}} · mdo</title>
+  <style>{{.Styles}}</style>
+</head>
+<body>
+  <div class="background" aria-hidden="true"></div>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="Voltar ao início">
+      <span class="brand-mark">M</span>
+      <span>mdo</span>
+    </a>
+    <div class="document-info">
+      <strong>{{.Title}}</strong>
+      <span title="{{.Path}}">{{.Path}}</span>
+    </div>
+    <button class="toc-button" type="button" aria-expanded="false" aria-controls="toc">Sumário</button>
+  </header>
+
+  <div class="layout" id="top">
+    <aside class="toc-shell" id="toc" aria-label="Sumário do documento">
+      <p class="toc-label">Neste documento</p>
+      <nav class="toc-nav"></nav>
+    </aside>
+
+    <main class="reader">
+      <article class="markdown-body">{{.Content}}</article>
+      <footer>Renderizado localmente por <span>mdo</span></footer>
+    </main>
+  </div>
+
+  <script>{{.Mermaid}}</script>
+  <script>
+    (() => {
+      const token = {{.Token}};
+      const article = document.querySelector('.markdown-body');
+      const toc = document.querySelector('.toc-nav');
+      const tocShell = document.querySelector('.toc-shell');
+      const tocButton = document.querySelector('.toc-button');
+
+      const slugCounts = new Map();
+      const headings = article.querySelectorAll('h1, h2, h3');
+      for (const heading of headings) {
+        if (!heading.id) {
+          const base = heading.textContent.toLowerCase().normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'secao';
+          const count = slugCounts.get(base) || 0;
+          slugCounts.set(base, count + 1);
+          heading.id = count ? `${base}-${count + 1}` : base;
+        }
+        const anchor = document.createElement('a');
+        anchor.className = 'heading-anchor';
+        anchor.href = `#${heading.id}`;
+        anchor.setAttribute('aria-label', `Link para ${heading.textContent}`);
+        anchor.textContent = '#';
+        heading.prepend(anchor);
+
+        const link = document.createElement('a');
+        link.href = `#${heading.id}`;
+        link.className = `toc-h${heading.tagName.slice(1)}`;
+        link.textContent = heading.textContent.replace(/^#/, '').trim();
+        link.addEventListener('click', () => {
+          tocShell.classList.remove('open');
+          tocButton.setAttribute('aria-expanded', 'false');
+        });
+        toc.append(link);
+      }
+      if (!headings.length) tocShell.hidden = true;
+
+      tocButton.addEventListener('click', () => {
+        const open = tocShell.classList.toggle('open');
+        tocButton.setAttribute('aria-expanded', String(open));
+      });
+
+      for (const link of article.querySelectorAll('a[href]')) {
+        if (/^https?:/i.test(link.href)) {
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+        }
+      }
+
+      for (const code of article.querySelectorAll('pre code')) {
+        if (code.classList.contains('language-mermaid')) continue;
+        const pre = code.closest('pre');
+        if (!pre || pre.parentElement?.classList.contains('code-shell')) continue;
+        const shell = document.createElement('div');
+        shell.className = 'code-shell';
+        pre.replaceWith(shell);
+        shell.append(pre);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'copy-button';
+        button.textContent = 'Copiar';
+        button.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(code.textContent);
+            button.textContent = 'Copiado';
+            setTimeout(() => { button.textContent = 'Copiar'; }, 1400);
+          } catch { button.textContent = 'Falhou'; }
+        });
+        shell.append(button);
+      }
+
+      async function prepare() {
+        for (const code of article.querySelectorAll('code.language-mermaid')) {
+          const container = code.closest('.highlight') || code.closest('pre');
+          const diagram = document.createElement('pre');
+          diagram.className = 'mermaid';
+          diagram.textContent = code.textContent;
+          container.replaceWith(diagram);
+        }
+
+        if (article.querySelector('.mermaid')) {
+          mermaid.initialize({
+            startOnLoad: false,
+            securityLevel: 'strict',
+            theme: 'dark',
+            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+            themeVariables: {
+              primaryColor: '#0b1927', primaryTextColor: '#f8fafc',
+              primaryBorderColor: '#00dc82', lineColor: '#94a3b8',
+              secondaryColor: '#111827', tertiaryColor: '#07111f'
+            }
+          });
+          await mermaid.run({ querySelector: '.mermaid', suppressErrors: false });
+        }
+      }
+
+      window.addEventListener('load', async () => {
+        try { await prepare(); }
+        catch (error) {
+          console.error('mdo: não foi possível renderizar Mermaid', error);
+        } finally {
+          fetch(`/${token}/ready`, {
+            method: 'POST',
+            headers: { 'X-MDO-Token': token },
+            keepalive: true
+          }).catch(() => {});
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
