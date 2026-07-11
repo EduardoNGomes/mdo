@@ -23,7 +23,10 @@
     </div>
     <div class="header-actions">
       <button class="theme-button" type="button" aria-label="Ativar tema claro" title="Alternar tema">
-        <span class="theme-icon" aria-hidden="true">☀</span>
+        <span class="theme-icon" aria-hidden="true">
+          <span class="theme-icon-glyph theme-icon-sun">☀</span>
+          <span class="theme-icon-glyph theme-icon-moon">☾</span>
+        </span>
         <span class="theme-label">Claro</span>
       </button>
       <button class="toc-button" type="button" aria-expanded="false" aria-controls="toc">Sumário</button>
@@ -51,21 +54,36 @@
       const tocShell = document.querySelector('.toc-shell');
       const tocButton = document.querySelector('.toc-button');
       const themeButton = document.querySelector('.theme-button');
-      const themeIcon = themeButton.querySelector('.theme-icon');
       const themeLabel = themeButton.querySelector('.theme-label');
       let renderingMermaid = false;
 
       function updateThemeButton() {
         const light = document.documentElement.dataset.theme === 'light';
-        themeIcon.textContent = light ? '☾' : '☀';
         themeLabel.textContent = light ? 'Escuro' : 'Claro';
         themeButton.setAttribute('aria-label', light ? 'Ativar tema escuro' : 'Ativar tema claro');
       }
 
       async function setTheme(theme) {
-        document.documentElement.dataset.theme = theme;
-        updateThemeButton();
-        await rerenderMermaid();
+        const root = document.documentElement;
+        const direction = theme === 'light' ? 'to-light' : 'to-dark';
+        const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        root.dataset.themeTransition = direction;
+
+        const applyTheme = async () => {
+          root.dataset.theme = theme;
+          updateThemeButton();
+          await rerenderMermaid();
+        };
+
+        if (!document.startViewTransition || reduceMotion) {
+          try { await applyTheme(); }
+          finally { delete root.dataset.themeTransition; }
+          return;
+        }
+
+        const transition = document.startViewTransition(applyTheme);
+        try { await transition.finished; }
+        finally { delete root.dataset.themeTransition; }
       }
 
       themeButton.addEventListener('click', async () => {
