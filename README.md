@@ -49,6 +49,38 @@ Depois copia o executável para `/usr/local/bin/mdo` usando `sudo`. Após a inst
 mdo README.md
 ```
 
+## Instalação por release
+
+Os instaladores baixam o pacote adequado dos assets da última release do GitHub e instalam o executável no sistema.
+
+### Linux
+
+```bash
+chmod +x ./install-linux.sh
+./install-linux.sh
+```
+
+Instala o `mdo` em `/usr/local/bin/mdo`.
+
+### macOS
+
+```bash
+chmod +x ./install-mac.sh
+./install-mac.sh
+```
+
+Instala o `mdo` em `/usr/local/bin/mdo`.
+
+### Windows
+
+Em um terminal PowerShell:
+
+```powershell
+.\install-windows.ps1
+```
+
+Instala o `mdo.exe` em `$env:USERPROFILE\bin` e adiciona esse diretório ao `PATH` do usuário quando necessário. Reinicie o terminal após a primeira instalação se o `PATH` for alterado.
+
 ## Instalação global com Go
 
 Para instalar a versão publicada do módulo globalmente:
