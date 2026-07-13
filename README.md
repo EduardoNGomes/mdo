@@ -23,32 +23,6 @@ Somente arquivos com extensão exata `.md` são aceitos.
 - diagramas Mermaid offline
 - imagens relativas ao arquivo Markdown
 
-## Build e instalação com `gobuild`
-
-O projeto mantém um entrypoint em `./cmd` compatível com a função customizada `gobuild`:
-
-```bash
-gobuild /caminho/para/mdo
-```
-
-Estando na raiz deste repositório, também é possível executar:
-
-```bash
-gobuild "$(pwd)"
-```
-
-A função gera um binário otimizado com:
-
-```bash
-go build -ldflags="-s -w" -o mdo ./cmd
-```
-
-Depois copia o executável para `/usr/local/bin/mdo` usando `sudo`. Após a instalação:
-
-```bash
-mdo README.md
-```
-
 ## Instalação por release
 
 Os instaladores baixam o pacote adequado dos assets da última release do GitHub e instalam o executável no sistema.
@@ -83,27 +57,13 @@ Instala o `mdo.exe` em `$env:USERPROFILE\bin` e adiciona esse diretório ao `PAT
 
 ## Instalação global com Go
 
-Para instalar a versão publicada do módulo globalmente:
+Para instalar a versão publicada do módulo:
 
 ```bash
 go install github.com/egomes/mdo@latest
 ```
 
 O executável será instalado em `GOBIN` ou, quando essa variável não estiver definida, em `$(go env GOPATH)/bin`. Esse diretório precisa estar no `PATH`.
-
-Para instalar diretamente a cópia local:
-
-```bash
-go install .
-```
-
-Desde o Go 1.17, `go get` não instala mais executáveis. Em versões antigas do Go, o comando equivalente era:
-
-```bash
-go get github.com/egomes/mdo
-```
-
-Nas versões atuais, use `go install github.com/egomes/mdo@latest`; executar `go get` apenas adicionaria o módulo como dependência de outro projeto.
 
 ## Testes
 
