@@ -282,12 +282,17 @@
         apply();
       }
 
+      function mermaidSourceWithFallback(source) {
+        if (!/^\s*sequenceDiagram\b/.test(source)) return source;
+        return source.replace(/;(?=<br\s*\/?>)/gi, '#59;');
+      }
+
       async function prepare() {
         for (const code of article.querySelectorAll('code.language-mermaid')) {
           const container = code.closest('.highlight') || code.closest('pre');
           const diagram = document.createElement('pre');
           diagram.className = 'mermaid';
-          diagram.dataset.mermaidSource = code.textContent;
+          diagram.dataset.mermaidSource = mermaidSourceWithFallback(code.textContent);
           diagram.textContent = diagram.dataset.mermaidSource;
           container.replaceWith(diagram);
         }
