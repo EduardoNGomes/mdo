@@ -24,6 +24,7 @@ func TestPageIncludesDocumentAndEmbeddedAssets(t *testing.T) {
 		`fetch(`, `enableDiagramZoom`, `Aumentar zoom`, `requestFullscreen`,
 		`Navegação do diagrama`, `Mover diagrama para a esquerda`,
 		`theme-button`, `prefers-color-scheme: light`, `rerenderMermaid`,
+		`mermaidSourceWithFallback`, `#59;`,
 		`startViewTransition`, `to-light`, `to-dark`, `theme-icon-sun`,
 		`pre.mermaid`, `pre:not(.mermaid)`,
 	} {
