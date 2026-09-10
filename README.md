@@ -2,6 +2,10 @@
 
 Leitor descartável de Markdown para o terminal e navegador, escrito em Go.
 
+<img width="1882" height="939" alt="image" src="https://github.com/user-attachments/assets/eaa00322-2dbb-4cd4-945d-b716010ef50e" />
+<img width="1889" height="925" alt="image" src="https://github.com/user-attachments/assets/fdfeb93b-1e7d-4bc2-99bc-f3dc020377bd" />
+
+
 ## Uso durante o desenvolvimento
 
 ```bash
