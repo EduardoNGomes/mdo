@@ -87,7 +87,7 @@ try {
     if ($RunningOnWindows) {
         Assert-True ([Environment]::GetEnvironmentVariable("Path", "Machine") -eq $ExpectedMachinePath) "System PATH was not persisted"
         Assert-True ([Environment]::GetEnvironmentVariable("Path", "User") -ceq $OriginalUserPath) "Installation changed user PATH"
-        Assert-True ((Get-Command mdo -CommandType Application).Source -eq $ExpectedTarget) "mdo is not available in the current terminal"
+        Assert-True ((Get-Command mdo -CommandType Application | Select-Object -First 1).Source -eq $ExpectedTarget) "The current terminal does not select the newly installed mdo"
     }
     Write-Output "PASS: first installation preserves PATH entries and updates the current session"
 
