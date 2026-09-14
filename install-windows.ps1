@@ -1,3 +1,8 @@
+#Requires -Version 5.1
+#Requires -RunAsAdministrator
+
+$ErrorActionPreference = "Stop"
+
 $Repo = "EduardoNGomes/mdo"
 $Bin = "mdo.exe"
 
@@ -13,7 +18,7 @@ switch ($Arch) {
 
 $File = "mdo-windows-$GoArch.zip"
 $Url = "https://github.com/$Repo/releases/latest/download/$File"
-$InstallPath = Join-Path $env:USERPROFILE "bin"
+$InstallPath = Join-Path $env:ProgramFiles "mdo"
 $Target = Join-Path $InstallPath $Bin
 $WorkDir = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
 
@@ -38,27 +43,33 @@ try {
     }
 
     Copy-Item (Join-Path $WorkDir $Bin) $Target -Force
-    Write-Output "Installation complete!"
 
-    $UserPath = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::User)
-    if ($null -eq $UserPath) {
-        $UserPath = ""
-    }
+    # Persist PATH for all users and update this PowerShell session too.
+    # Check each scope independently: Machine may already be correct in a stale terminal.
+    foreach ($Scope in @([EnvironmentVariableTarget]::Machine, [EnvironmentVariableTarget]::Process)) {
+        $CurrentPath = [Environment]::GetEnvironmentVariable("Path", $Scope)
+        $PathEntries = @($CurrentPath -split ";" | ForEach-Object {
+            [Environment]::ExpandEnvironmentVariables($_.Trim().Trim('"')).TrimEnd('\', '/')
+        })
 
-    if (-not ($UserPath -split ";" | Where-Object { $_ -eq $InstallPath })) {
-        if ($UserPath.Length -eq 0) {
-            $NewPath = $InstallPath
-        } else {
-            $NewPath = $UserPath.TrimEnd(";") + ";" + $InstallPath
+        if ($PathEntries -contains $InstallPath.TrimEnd('\', '/')) {
+            continue
         }
 
-        [Environment]::SetEnvironmentVariable(
-            "Path",
-            $NewPath,
-            [EnvironmentVariableTarget]::User
-        )
-        Write-Output "Added $InstallPath to PATH. Restart your terminal."
+        if ([string]::IsNullOrEmpty($CurrentPath)) {
+            $NewPath = $InstallPath
+        } elseif ($Scope -eq [EnvironmentVariableTarget]::Process) {
+            # Prefer this installation over an older copy in the user's bin directory.
+            $NewPath = $InstallPath + ";" + $CurrentPath.TrimStart(";")
+        } else {
+            $NewPath = $CurrentPath.TrimEnd(";") + ";" + $InstallPath
+        }
+
+        [Environment]::SetEnvironmentVariable("Path", $NewPath, $Scope)
+        Write-Output "Added $InstallPath to $Scope PATH."
     }
+
+    Write-Output "Installation complete! Run: mdo <file.md>"
 } finally {
     if (Test-Path $WorkDir) {
         Remove-Item $WorkDir -Recurse -Force
