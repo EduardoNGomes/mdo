@@ -51,11 +51,14 @@ Instala o `mdo` em `/usr/local/bin/mdo`.
 
 ### Windows
 
-Abra o PowerShell com **Executar como administrador** e execute:
+Abra o PowerShell com **Executar como administrador**, acesse a pasta que contém `install-windows.ps1` e execute os dois comandos na mesma janela:
 
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 .\install-windows.ps1
 ```
+
+A liberação de scripts acima vale somente para essa sessão do PowerShell e termina quando a janela é fechada.
 
 Instala o `mdo.exe` em `$env:ProgramFiles\mdo` (normalmente `C:\Program Files\mdo`) e adiciona esse diretório ao `PATH` do sistema, disponível para todos os usuários e preservado após reiniciar ou desligar o computador. A instalação exige administrador para gravar nesse diretório e alterar a variável do sistema.
 
