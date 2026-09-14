@@ -9,6 +9,21 @@ permissions:
   contents: read
 
 jobs:
+  test-windows-installer:
+    name: Windows installer (${{ matrix.shell }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Test installation and PATH registration
+        shell: ${{ matrix.shell }}
+        run: .\tests\install-windows.Tests.ps1
+
   test:
     name: Test
     runs-on: ubuntu-latest

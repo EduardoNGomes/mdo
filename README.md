@@ -51,13 +51,22 @@ Instala o `mdo` em `/usr/local/bin/mdo`.
 
 ### Windows
 
-Em um terminal PowerShell:
+Abra o PowerShell com **Executar como administrador** e execute:
 
 ```powershell
 .\install-windows.ps1
 ```
 
-Instala o `mdo.exe` em `$env:USERPROFILE\bin` e adiciona esse diretório ao `PATH` do usuário quando necessário. Reinicie o terminal após a primeira instalação se o `PATH` for alterado.
+Instala o `mdo.exe` em `$env:ProgramFiles\mdo` (normalmente `C:\Program Files\mdo`) e adiciona esse diretório ao `PATH` do sistema, disponível para todos os usuários e preservado após reiniciar ou desligar o computador. A instalação exige administrador para gravar nesse diretório e alterar a variável do sistema.
+
+O instalador também atualiza o `PATH` da sessão atual do PowerShell. O comando fica disponível imediatamente no terminal em que você executou o script:
+
+```powershell
+Get-Command mdo
+mdo .\README.md
+```
+
+Outros terminais que já estavam abertos precisam ser fechados e reabertos para receber o novo `PATH`. Se estiver usando o Windows Terminal, feche todas as janelas do aplicativo e abra-o novamente.
 
 ## Instalação global com Go
 
