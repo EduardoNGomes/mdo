@@ -20,8 +20,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Test installation and PATH registration
-        shell: ${{ matrix.shell }}
+      - name: Test installation and PATH registration in Windows PowerShell
+        if: matrix.shell == 'powershell'
+        shell: powershell
+        run: .\tests\install-windows.Tests.ps1
+
+      - name: Test installation and PATH registration in PowerShell 7
+        if: matrix.shell == 'pwsh'
+        shell: pwsh
         run: .\tests\install-windows.Tests.ps1
 
   test:
