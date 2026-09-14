@@ -32,22 +32,20 @@ jobs:
 
   test:
     name: Test
+    uses: EduardoNGomes/shared-workflows/.github/workflows/go-test-simple.yml@main
+
+  verify-build:
+    name: Verify build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - name: Run tests
-        run: go test ./...
-
-      - name: Run race detector
-        run: go test -race ./...
-
-      - name: Verify build
+      - name: Build application
         run: go build -trimpath -ldflags="-s -w" -o /tmp/mdo ./cmd
