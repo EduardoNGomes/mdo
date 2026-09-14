@@ -130,10 +130,30 @@
       });
 
       for (const link of article.querySelectorAll('a[href]')) {
-        if (/^https?:/i.test(link.href)) {
+        const href = link.getAttribute('href') || '';
+        if (/^https?:\/\//i.test(href)) {
           link.target = '_blank';
           link.rel = 'noopener noreferrer';
         }
+      }
+
+      for (const link of document.querySelectorAll('a[href^="#"]')) {
+        link.addEventListener('click', (event) => {
+          const hash = link.getAttribute('href');
+          if (!hash || hash === '#') return;
+
+          let target;
+          try { target = document.getElementById(decodeURIComponent(hash.slice(1))); }
+          catch { return; }
+          if (!target) return;
+
+          event.preventDefault();
+          target.scrollIntoView({
+            behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+            block: 'start',
+          });
+          history.pushState(null, '', hash);
+        });
       }
 
       for (const code of article.querySelectorAll('pre code')) {

@@ -26,9 +26,13 @@ func TestPageIncludesDocumentAndEmbeddedAssets(t *testing.T) {
 		`theme-button`, `prefers-color-scheme: light`, `rerenderMermaid`,
 		`startViewTransition`, `to-light`, `to-dark`, `theme-icon-sun`,
 		`pre.mermaid`, `pre:not(.mermaid)`,
+		`link.getAttribute('href')`, `a[href^="#"]`, `target.scrollIntoView`,
 	} {
 		if !strings.Contains(html, expected) {
 			t.Errorf("Page() output does not contain %q", expected)
 		}
+	}
+	if strings.Contains(html, `test(link.href)`) {
+		t.Error("Page() classifies resolved fragment URLs as external links")
 	}
 }
