@@ -4,8 +4,7 @@ Leitor descartável de Markdown para o terminal e navegador, escrito em Go.
 
 > [!NOTE]
 > This is a vibe-coded project: it is built experimentally with AI-assisted
-> coding and human direction/review. Treat it as an exploratory tool and
-> review the code and security implications before using it in production.
+> coding and human direction/review.
 
 <img width="1882" height="939" alt="image" src="https://github.com/user-attachments/assets/eaa00322-2dbb-4cd4-945d-b716010ef50e" />
 <img width="1889" height="925" alt="image" src="https://github.com/user-attachments/assets/fdfeb93b-1e7d-4bc2-99bc-f3dc020377bd" />
