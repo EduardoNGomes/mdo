@@ -80,9 +80,39 @@ func TestReadMarkdownRejectsLargeFile(t *testing.T) {
 }
 
 func TestRunRequiresOneArgument(t *testing.T) {
-	for _, args := range [][]string{nil, {"one.md", "two.md"}} {
+	for _, args := range [][]string{nil, {"one.md", "two.md"}, {"--unknown", "one.md"}} {
 		if err := Run(args); err != errUsage {
 			t.Errorf("Run(%q) error = %v, want %v", args, err, errUsage)
 		}
+	}
+}
+
+func TestParseArgs(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want runOptions
+		fail bool
+	}{
+		{name: "local", args: []string{"file.md"}, want: runOptions{markdownPath: "file.md"}},
+		{name: "short live flag", args: []string{"-l", "file.md"}, want: runOptions{markdownPath: "file.md", live: true}},
+		{name: "long live flag after file", args: []string{"file.md", "--live"}, want: runOptions{markdownPath: "file.md", live: true}},
+		{name: "missing file", args: []string{"--live"}, fail: true},
+		{name: "unknown flag", args: []string{"--share", "file.md"}, fail: true},
+		{name: "two files", args: []string{"one.md", "two.md"}, fail: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseArgs(tt.args)
+			if tt.fail {
+				if err != errUsage {
+					t.Fatalf("parseArgs(%q) error = %v, want %v", tt.args, err, errUsage)
+				}
+				return
+			}
+			if err != nil || got != tt.want {
+				t.Fatalf("parseArgs(%q) = %#v, %v; want %#v, nil", tt.args, got, err, tt.want)
+			}
+		})
 	}
 }
