@@ -20,6 +20,7 @@ func TestPageIncludesDocumentAndEmbeddedAssets(t *testing.T) {
 
 	for _, expected := range []string{
 		`README &lt;test&gt;.md`, `<h1 id="hello">Hello</h1>`,
+		`<link rel="icon" href="data:,">`,
 		`globalThis["mermaid"]`, `const token = "abc123"`,
 		`fetch(`, `enableDiagramZoom`, `Aumentar zoom`, `requestFullscreen`,
 		`Navegação do diagrama`, `Mover diagrama para a esquerda`,
