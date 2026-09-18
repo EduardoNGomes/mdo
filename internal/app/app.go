@@ -11,13 +11,16 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/egomes/mdo/internal/browser"
 	"github.com/egomes/mdo/internal/document"
+	"github.com/egomes/mdo/internal/ngrok"
 	webassets "github.com/egomes/mdo/internal/web"
 )
 
@@ -26,14 +29,20 @@ const (
 	shutdownTimeout = 20 * time.Second
 )
 
-var errUsage = errors.New("uso: mdo <arquivo.md>")
+var errUsage = errors.New("usage: mdo [-l|--live] <file.md>")
+
+type runOptions struct {
+	markdownPath string
+	live         bool
+}
 
 func Run(args []string) error {
-	if len(args) != 1 {
-		return errUsage
+	options, err := parseArgs(args)
+	if err != nil {
+		return err
 	}
 
-	path, source, err := readMarkdown(args[0])
+	path, source, err := readMarkdown(options.markdownPath)
 	if err != nil {
 		return err
 	}
@@ -58,7 +67,34 @@ func Run(args []string) error {
 		return fmt.Errorf("montar página: %w", err)
 	}
 
-	return serveAndOpen(path, token, page)
+	var ngrokBinary string
+	if options.live {
+		ngrokBinary, err = ngrok.Lookup()
+		if err != nil {
+			return err
+		}
+	}
+
+	return serveAndOpen(path, token, page, options.live, ngrokBinary)
+}
+
+func parseArgs(args []string) (runOptions, error) {
+	var options runOptions
+	for _, arg := range args {
+		switch arg {
+		case "-l", "--live":
+			options.live = true
+		default:
+			if strings.HasPrefix(arg, "-") || options.markdownPath != "" {
+				return runOptions{}, errUsage
+			}
+			options.markdownPath = arg
+		}
+	}
+	if options.markdownPath == "" {
+		return runOptions{}, errUsage
+	}
+	return options, nil
 }
 
 func readMarkdown(input string) (string, []byte, error) {
@@ -97,7 +133,7 @@ func readMarkdown(input string) (string, []byte, error) {
 	return path, data, nil
 }
 
-func serveAndOpen(markdownPath, token string, page []byte) error {
+func serveAndOpen(markdownPath, token string, page []byte, live bool, ngrokBinary string) error {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return fmt.Errorf("abrir porta local: %w", err)
@@ -137,11 +173,23 @@ func serveAndOpen(markdownPath, token string, page []byte) error {
 	}
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- server.Serve(listener) }()
+	defer shutdownServer(server)
 
 	url := "http://" + listener.Addr().String() + basePath
+	var tunnel *ngrok.Tunnel
+	if live {
+		tunnel, err = ngrok.Start(ngrokBinary, listener.Addr().String())
+		if err != nil {
+			return err
+		}
+		defer tunnel.Close()
+		fmt.Printf("Live URL: %s%s\nPress Ctrl+C to stop sharing.\n", tunnel.URL(), basePath)
+	}
 	if err := browser.Open(url); err != nil {
-		_ = server.Close()
 		return fmt.Errorf("abrir navegador (%s): %w", url, err)
+	}
+	if live {
+		return waitForLiveServer(serveErr, tunnel)
 	}
 
 	select {
@@ -153,12 +201,35 @@ func serveAndOpen(markdownPath, token string, page []byte) error {
 	case <-time.After(shutdownTimeout):
 	}
 
+	return nil
+}
+
+func waitForLiveServer(serveErr <-chan error, tunnel *ngrok.Tunnel) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	select {
+	case <-ctx.Done():
+		return nil
+	case err := <-serveErr:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("local server: %w", err)
+		}
+		return nil
+	case <-tunnel.Done():
+		err := tunnel.Err()
+		if err != nil {
+			return fmt.Errorf("ngrok stopped: %w", err)
+		}
+		return errors.New("ngrok stopped unexpectedly")
+	}
+}
+
+func shutdownServer(server *http.Server) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
 		_ = server.Close()
 	}
-	return nil
 }
 
 func setSecurityHeaders(w http.ResponseWriter) {

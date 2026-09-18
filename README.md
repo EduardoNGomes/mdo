@@ -2,6 +2,11 @@
 
 Leitor descartável de Markdown para o terminal e navegador, escrito em Go.
 
+> [!NOTE]
+> This is a vibe-coded project: it is built experimentally with AI-assisted
+> coding and human direction/review. Treat it as an exploratory tool and
+> review the code and security implications before using it in production.
+
 <img width="1882" height="939" alt="image" src="https://github.com/user-attachments/assets/eaa00322-2dbb-4cd4-945d-b716010ef50e" />
 <img width="1889" height="925" alt="image" src="https://github.com/user-attachments/assets/fdfeb93b-1e7d-4bc2-99bc-f3dc020377bd" />
 
@@ -15,6 +20,30 @@ go run . README.md
 O `mdo` valida o arquivo, escolhe uma porta local livre, abre o navegador e encerra o servidor assim que a página e os diagramas Mermaid terminam de renderizar. A página já carregada continua disponível, mas não pode ser recarregada depois que o servidor encerra.
 
 Somente arquivos com extensão exata `.md` são aceitos.
+
+### Compartilhar temporariamente pela internet
+
+Use `--live` (ou `-l`) para criar um link público temporário com ngrok:
+
+```bash
+mdo --live README.md
+# ou
+mdo -l README.md
+```
+
+Antes disso, instale o [ngrok Agent CLI](https://ngrok.com/download), crie ou
+acesse sua conta e configure o authtoken uma vez:
+
+```bash
+ngrok config add-authtoken <YOUR_TOKEN>
+```
+
+O `mdo` imprime o link HTTPS que deve ser compartilhado e mantém o servidor e
+o túnel ativos até você pressionar `Ctrl+C`. O modo usa apenas o domínio de
+desenvolvimento automático do plano gratuito: não configura domínio reservado
+nem recursos pagos. Consulte o [quickstart do ngrok](https://ngrok.com/docs/share-localhost/quickstart)
+para obter o token e instruções de instalação. Sem `-l`/`--live`, o `mdo`
+continua funcionando somente em localhost e não procura nem exige o ngrok.
 
 ## Recursos
 
