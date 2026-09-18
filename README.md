@@ -134,32 +134,6 @@ Run the race detector with:
 go test -race ./...
 ```
 
-### Releases and binaries
-
-Publishing a GitHub Release with a semantic tag such as `v0.1.0` runs the test
-suite and attaches these packages to the release:
-
-| Platform | Architecture | File |
-| --- | --- | --- |
-| Linux | amd64 | `mdo-linux-amd64.tar.gz` |
-| Linux | arm64 | `mdo-linux-arm64.tar.gz` |
-| macOS | amd64 | `mdo-darwin-amd64.tar.gz` |
-| macOS | arm64 | `mdo-darwin-arm64.tar.gz` |
-| Windows | amd64 | `mdo-windows-amd64.zip` |
-| Windows | arm64 | `mdo-windows-arm64.zip` |
-
-`checksums.txt` contains the SHA-256 hash of every package. A separate binary
-repository is not required.
-
-To create a release with the GitHub CLI:
-
-```bash
-gh release create v0.1.0 --generate-notes
-```
-
-Publishing the release starts the build automatically. Binaries are also
-available on the [Releases page](https://github.com/EduardoNGomes/mdo/releases).
-
 ```mermaid
 flowchart LR
     A[Markdown] --> B[mdo]
@@ -294,32 +268,6 @@ Para incluir o detector de condições de corrida:
 ```bash
 go test -race ./...
 ```
-
-### Releases e binários
-
-Ao publicar uma GitHub Release com uma tag semântica, por exemplo `v0.1.0`, o
-CI executa os testes e anexa à própria release os seguintes pacotes:
-
-| Sistema | Arquitetura | Arquivo |
-| --- | --- | --- |
-| Linux | amd64 | `mdo-linux-amd64.tar.gz` |
-| Linux | arm64 | `mdo-linux-arm64.tar.gz` |
-| macOS | amd64 | `mdo-darwin-amd64.tar.gz` |
-| macOS | arm64 | `mdo-darwin-arm64.tar.gz` |
-| Windows | amd64 | `mdo-windows-amd64.zip` |
-| Windows | arm64 | `mdo-windows-arm64.zip` |
-
-O arquivo `checksums.txt` contém os hashes SHA-256 de todos os pacotes. Não é
-necessário manter um repositório separado para os binários.
-
-Para criar uma release pela CLI do GitHub:
-
-```bash
-gh release create v0.1.0 --generate-notes
-```
-
-A publicação da release dispara o build automaticamente. Os binários também
-ficam disponíveis na [página de releases](https://github.com/EduardoNGomes/mdo/releases).
 
 ```mermaid
 flowchart LR
