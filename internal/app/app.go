@@ -29,17 +29,26 @@ const (
 	shutdownTimeout = 20 * time.Second
 )
 
-var errUsage = errors.New("usage: mdo [-l|--live] <file.md>")
+var (
+	errUsage = errors.New("usage: mdo [-l|--live] <file.md>\n       mdo --version")
+	// Version is set by release builds with -ldflags. Development builds use dev.
+	Version = "dev"
+)
 
 type runOptions struct {
 	markdownPath string
 	live         bool
+	version      bool
 }
 
 func Run(args []string) error {
 	options, err := parseArgs(args)
 	if err != nil {
 		return err
+	}
+	if options.version {
+		fmt.Println(Version)
+		return nil
 	}
 
 	path, source, err := readMarkdown(options.markdownPath)
@@ -82,16 +91,24 @@ func parseArgs(args []string) (runOptions, error) {
 	var options runOptions
 	for _, arg := range args {
 		switch arg {
+		case "--version", "-v":
+			if options.version || options.markdownPath != "" || options.live {
+				return runOptions{}, errUsage
+			}
+			options.version = true
 		case "-l", "--live":
+			if options.version {
+				return runOptions{}, errUsage
+			}
 			options.live = true
 		default:
-			if strings.HasPrefix(arg, "-") || options.markdownPath != "" {
+			if strings.HasPrefix(arg, "-") || options.markdownPath != "" || options.version {
 				return runOptions{}, errUsage
 			}
 			options.markdownPath = arg
 		}
 	}
-	if options.markdownPath == "" {
+	if !options.version && options.markdownPath == "" {
 		return runOptions{}, errUsage
 	}
 	return options, nil

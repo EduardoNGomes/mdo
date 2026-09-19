@@ -66,6 +66,26 @@ continues to run only on localhost and does not look for or require ngrok.
 The installers download the package for the current platform from the latest
 GitHub Release and install the executable on the system.
 
+### Install with a package manager
+
+Once published to npm, install `mdo` globally with one of these commands:
+
+```bash
+npm install --global @egomes.dev/mdo
+pnpm add --global @egomes.dev/mdo
+yarn global add @egomes.dev/mdo # Yarn Classic
+```
+
+The npm package selects the native binary for your operating system and CPU.
+Check for a newer release or install it with:
+
+```bash
+mdo update --check
+mdo update
+```
+
+`mdo update` uses the package manager that originally installed the command.
+
 #### Linux
 
 ```bash
@@ -199,6 +219,26 @@ continua funcionando somente em localhost e não procura nem exige o ngrok.
 
 Os instaladores baixam o pacote adequado dos assets da última release do GitHub
 e instalam o executável no sistema.
+
+### Instalação com gerenciador de pacotes
+
+Depois da publicação no npm, instale o `mdo` globalmente com um destes comandos:
+
+```bash
+npm install --global @egomes.dev/mdo
+pnpm add --global @egomes.dev/mdo
+yarn global add @egomes.dev/mdo # Yarn Classic
+```
+
+O pacote npm seleciona o binário nativo para seu sistema operacional e CPU.
+Verifique se há uma release nova ou instale-a com:
+
+```bash
+mdo update --check
+mdo update
+```
+
+`mdo update` usa o gerenciador de pacotes que instalou o comando originalmente.
 
 #### Linux
 

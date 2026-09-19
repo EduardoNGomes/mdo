@@ -97,7 +97,10 @@ func TestParseArgs(t *testing.T) {
 		{name: "local", args: []string{"file.md"}, want: runOptions{markdownPath: "file.md"}},
 		{name: "short live flag", args: []string{"-l", "file.md"}, want: runOptions{markdownPath: "file.md", live: true}},
 		{name: "long live flag after file", args: []string{"file.md", "--live"}, want: runOptions{markdownPath: "file.md", live: true}},
+		{name: "version", args: []string{"--version"}, want: runOptions{version: true}},
+		{name: "short version", args: []string{"-v"}, want: runOptions{version: true}},
 		{name: "missing file", args: []string{"--live"}, fail: true},
+		{name: "version with file", args: []string{"--version", "file.md"}, fail: true},
 		{name: "unknown flag", args: []string{"--share", "file.md"}, fail: true},
 		{name: "two files", args: []string{"one.md", "two.md"}, fail: true},
 	}
