@@ -20,3 +20,106 @@ jobs:
     uses: EduardoNGomes/shared-workflows/.github/workflows/go-os-build.yml@main
     with:
       name: mdo
+
+  publish-npm:
+    name: Publish npm packages
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NPM_CONFIG_PROVENANCE: true
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Install npm with staged-publishing support
+        run: npm install --global npm@11
+
+      - name: Validate release version
+        id: version
+        shell: bash
+        run: |
+          tag='${{ github.event.release.tag_name }}'
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tag must be vMAJOR.MINOR.PATCH: $tag" >&2
+            exit 1
+          fi
+          version="${tag#v}"
+          npm_tag=latest
+          if [[ "$version" == *-* ]]; then npm_tag=next; fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "npm_tag=$npm_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Test launcher
+        run: npm test --prefix npm
+
+      - name: Build release binaries
+        shell: bash
+        run: |
+          mkdir -p .npm-artifacts
+          for target in darwin/arm64 darwin/amd64 linux/arm64 linux/amd64 windows/arm64 windows/amd64; do
+            IFS=/ read -r goos goarch <<< "$target"
+            extension=''
+            platform="$goos"
+            if [[ "$goos" == windows ]]; then extension=.exe; platform=win32; fi
+            package_arch="$goarch"
+            if [[ "$goarch" == amd64 ]]; then package_arch=x64; fi
+            output=".npm-artifacts/mdo-$platform-$package_arch$extension"
+            GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X github.com/egomes/mdo/internal/app.Version=${{ steps.version.outputs.value }}" -o "$output" ./cmd
+          done
+
+      - name: Assemble npm packages
+        run: node npm/scripts/prepare-release.js '${{ steps.version.outputs.value }}' .npm-artifacts .npm-publish
+
+      - name: Inspect package contents
+        shell: bash
+        run: |
+          for directory in .npm-publish/*; do
+            npm pack --dry-run "$directory"
+          done
+
+      - name: Stage platform packages
+        shell: bash
+        run: |
+          for directory in .npm-publish/mdo-*/; do
+            name="$(node -p "require(require('node:path').resolve(process.argv[1], 'package.json')).name" "$directory")"
+            if npm view "$name@${{ steps.version.outputs.value }}" version >/dev/null 2>&1; then
+              test "$(npm view "$name@${{ steps.version.outputs.value }}" version)" = '${{ steps.version.outputs.value }}'
+              echo "$name@${{ steps.version.outputs.value }} already exists; verified."
+            else
+              npm stage publish "$directory" --access public --tag '${{ steps.version.outputs.npm_tag }}'
+            fi
+          done
+
+      - name: Stage launcher package
+        shell: bash
+        run: |
+          if npm view "@egomes.dev/mdo@${{ steps.version.outputs.value }}" version >/dev/null 2>&1; then
+            test "$(npm view "@egomes.dev/mdo@${{ steps.version.outputs.value }}" version)" = '${{ steps.version.outputs.value }}'
+            echo "@egomes.dev/mdo@${{ steps.version.outputs.value }} already exists; verified."
+          else
+            npm stage publish .npm-publish/mdo --access public --tag '${{ steps.version.outputs.npm_tag }}'
+          fi
+
+      - name: Report pending staged releases
+        run: |
+          npm stage list @egomes.dev/mdo
+          for name in @egomes.dev/mdo-darwin-arm64 @egomes.dev/mdo-darwin-x64 @egomes.dev/mdo-linux-arm64 @egomes.dev/mdo-linux-x64 @egomes.dev/mdo-win32-arm64 @egomes.dev/mdo-win32-x64; do
+            npm stage list "$name"
+          done
