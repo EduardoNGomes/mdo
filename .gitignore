@@ -1,3 +1,15 @@
 /mdo
 *.md
 !README.md
+
+# Local npm credentials, dependencies, and release artifacts.
+.npmrc
+npm/.npmrc
+npm/node_modules/
+npm/.npm-artifacts/
+npm/.npm-publish/
+npm/*.tgz
+npm/npm-debug.log*
+.env
+.env.*
+!.env.example

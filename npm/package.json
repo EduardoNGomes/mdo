@@ -1,0 +1,32 @@
+{
+  "name": "@egomes.dev/mdo",
+  "version": "0.0.0-development",
+  "description": "A disposable Markdown reader for the terminal and browser",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EduardoNGomes/mdo.git"
+  },
+  "bugs": "https://github.com/EduardoNGomes/mdo/issues",
+  "homepage": "https://github.com/EduardoNGomes/mdo#readme",
+  "bin": {
+    "mdo": "bin/mdo.js"
+  },
+  "files": [
+    "bin",
+    "lib"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/**/*.test.js"
+  },
+  "optionalDependencies": {
+    "@egomes.dev/mdo-darwin-arm64": "0.0.0-development",
+    "@egomes.dev/mdo-darwin-x64": "0.0.0-development",
+    "@egomes.dev/mdo-linux-arm64": "0.0.0-development",
+    "@egomes.dev/mdo-linux-x64": "0.0.0-development",
+    "@egomes.dev/mdo-win32-arm64": "0.0.0-development",
+    "@egomes.dev/mdo-win32-x64": "0.0.0-development"
+  }
+}
