@@ -60,6 +60,15 @@ continues to run only on localhost and does not look for or require ngrok.
 - code block copying
 - offline Mermaid diagrams
 - images relative to the Markdown file
+- PDF download with heading bookmarks (requires a Chrome-compatible browser)
+
+### PDF export
+
+After the document and its Mermaid diagrams load, use **Download PDF**. `mdo`
+uses a local headless Chrome-compatible browser to produce the download, so
+its headings appear as bookmarks in supporting PDF viewers. Chrome, Chromium,
+Brave, and Microsoft Edge are supported; install one of them if PDF export is
+unavailable. The normal document view may still use any default browser.
 
 ### Install from a release
 
@@ -214,6 +223,16 @@ continua funcionando somente em localhost e não procura nem exige o ngrok.
 - cópia de blocos de código
 - diagramas Mermaid offline
 - imagens relativas ao arquivo Markdown
+- download de PDF com marcadores de títulos (requer navegador compatível com Chrome)
+
+### Exportação de PDF
+
+Depois que o documento e os diagramas Mermaid carregarem, use **Download PDF**.
+O `mdo` usa localmente um navegador compatível com Chrome em modo headless
+para gerar o download, para que os títulos apareçam como marcadores em leitores
+de PDF compatíveis. Chrome, Chromium, Brave e Microsoft Edge são suportados;
+instale um deles caso a exportação esteja indisponível. A visualização normal
+do documento pode continuar usando qualquer navegador padrão.
 
 ### Instalação por release
 

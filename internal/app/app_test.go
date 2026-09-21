@@ -1,11 +1,50 @@
 package app
 
 import (
+	"bytes"
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestGeneratePDF(t *testing.T) {
+	if !chromeAvailable() {
+		t.Skip("no Chrome-compatible browser is installed")
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(`<!doctype html><h1>Documento</h1><h2>Seção</h2><script>window.mdoReady = true</script>`))
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), pdfTimeout)
+	defer cancel()
+	pdf, err := generatePDF(ctx, server.URL)
+	if err != nil {
+		t.Fatalf("generatePDF() error = %v", err)
+	}
+	if !bytes.HasPrefix(pdf, []byte("%PDF-")) {
+		t.Fatalf("generatePDF() returned %q, want a PDF", pdf[:min(len(pdf), 8)])
+	}
+	if !bytes.Contains(pdf, []byte("/Outlines")) {
+		t.Error("generatePDF() did not embed a document outline")
+	}
+}
+
+func chromeAvailable() bool {
+	for _, name := range []string{"google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "brave", "brave-browser", "msedge"} {
+		if _, err := exec.LookPath(name); err == nil {
+			return true
+		}
+	}
+	return false
+}
 
 func TestReadMarkdown(t *testing.T) {
 	dir := t.TempDir()

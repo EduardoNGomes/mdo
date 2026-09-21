@@ -18,6 +18,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/chromedp/cdproto/page"
+	"github.com/chromedp/chromedp"
 	"github.com/egomes/mdo/internal/browser"
 	"github.com/egomes/mdo/internal/document"
 	"github.com/egomes/mdo/internal/ngrok"
@@ -27,12 +29,14 @@ import (
 const (
 	maxMarkdownSize = 16 << 20
 	shutdownTimeout = 20 * time.Second
+	pdfTimeout      = 45 * time.Second
 )
 
 var (
 	errUsage = errors.New("usage: mdo [-l|--live] <file.md>\n       mdo --version")
 	// Version is set by release builds with -ldflags. Development builds use dev.
-	Version = "dev"
+	Version      = "dev"
+	pdfGenerator = generatePDF
 )
 
 type runOptions struct {
@@ -69,6 +73,7 @@ func Run(args []string) error {
 	page, err := webassets.Page(webassets.PageData{
 		Title:   filepath.Base(path),
 		Path:    path,
+		PDFName: strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)) + ".pdf",
 		Content: content,
 		Token:   token,
 	})
@@ -158,6 +163,8 @@ func serveAndOpen(markdownPath, token string, page []byte, live bool, ngrokBinar
 
 	basePath := "/" + token + "/"
 	readyPath := basePath + "ready"
+	pdfPath := basePath + "pdf"
+	url := "http://" + listener.Addr().String() + basePath
 	ready := make(chan struct{})
 	var readyOnce sync.Once
 	assets := http.StripPrefix(basePath, http.FileServer(http.Dir(filepath.Dir(markdownPath))))
@@ -177,6 +184,26 @@ func serveAndOpen(markdownPath, token string, page []byte, live bool, ngrokBinar
 		w.WriteHeader(http.StatusNoContent)
 		readyOnce.Do(func() { close(ready) })
 	})
+	mux.HandleFunc("GET "+pdfPath, func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-MDO-Token") != token {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), pdfTimeout)
+		defer cancel()
+		pdf, err := pdfGenerator(ctx, url+"?pdf=1")
+		if err != nil {
+			http.Error(w, "não foi possível gerar o PDF", http.StatusInternalServerError)
+			return
+		}
+
+		setSecurityHeaders(w)
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Content-Type", "application/pdf")
+		w.Header().Set("Content-Disposition", `attachment; filename="`+strings.TrimSuffix(filepath.Base(markdownPath), filepath.Ext(markdownPath))+`.pdf"`)
+		_, _ = w.Write(pdf)
+	})
 	mux.Handle(basePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		setSecurityHeaders(w)
 		assets.ServeHTTP(w, r)
@@ -185,14 +212,13 @@ func serveAndOpen(markdownPath, token string, page []byte, live bool, ngrokBinar
 	server := &http.Server{
 		Handler:           mux,
 		ReadHeaderTimeout: 3 * time.Second,
-		WriteTimeout:      15 * time.Second,
+		WriteTimeout:      pdfTimeout + 5*time.Second,
 		IdleTimeout:       15 * time.Second,
 	}
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- server.Serve(listener) }()
 	defer shutdownServer(server)
 
-	url := "http://" + listener.Addr().String() + basePath
 	var tunnel *ngrok.Tunnel
 	if live {
 		tunnel, err = ngrok.Start(ngrokBinary, listener.Addr().String())
@@ -219,6 +245,34 @@ func serveAndOpen(markdownPath, token string, page []byte, live bool, ngrokBinar
 	}
 
 	return nil
+}
+
+func generatePDF(ctx context.Context, pageURL string) ([]byte, error) {
+	allocator, cancelAllocator := chromedp.NewExecAllocator(ctx, chromedp.DefaultExecAllocatorOptions[:]...)
+	defer cancelAllocator()
+	browserContext, cancelBrowser := chromedp.NewContext(allocator)
+	defer cancelBrowser()
+
+	var pdf []byte
+	err := chromedp.Run(browserContext,
+		chromedp.Navigate(pageURL),
+		chromedp.WaitReady("body", chromedp.ByQuery),
+		chromedp.Poll(`window.mdoReady === true`, nil, chromedp.WithPollingInterval(100*time.Millisecond)),
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			var err error
+			pdf, _, err = page.PrintToPDF().
+				WithPrintBackground(true).
+				WithPreferCSSPageSize(true).
+				WithGenerateTaggedPDF(true).
+				WithGenerateDocumentOutline(true).
+				Do(ctx)
+			return err
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("renderizar PDF: %w", err)
+	}
+	return pdf, nil
 }
 
 func waitForLiveServer(serveErr <-chan error, tunnel *ngrok.Tunnel) error {
