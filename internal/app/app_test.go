@@ -13,6 +13,9 @@ import (
 )
 
 func TestGeneratePDF(t *testing.T) {
+	if os.Getenv("CI") != "" {
+		t.Skip("headless Chrome sandbox is unavailable in CI")
+	}
 	if !chromeAvailable() {
 		t.Skip("no Chrome-compatible browser is installed")
 	}
