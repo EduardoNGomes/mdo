@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,7 +14,7 @@
 <body>
   <div class="background" aria-hidden="true"></div>
   <header class="topbar">
-    <a class="brand" href="#top" aria-label="Voltar ao início">
+    <a class="brand" href="#top" aria-label="Back to top">
       <span class="brand-mark">M</span>
       <span>mdo</span>
     </a>
@@ -23,26 +23,27 @@
       <span title="{{.Path}}">{{.Path}}</span>
     </div>
     <div class="header-actions">
-      <button class="theme-button" type="button" aria-label="Ativar tema claro" title="Alternar tema">
+      <button class="theme-button" type="button" aria-label="Switch to light theme" title="Toggle theme">
         <span class="theme-icon" aria-hidden="true">
           <span class="theme-icon-glyph theme-icon-sun">☀</span>
           <span class="theme-icon-glyph theme-icon-moon">☾</span>
         </span>
-        <span class="theme-label">Claro</span>
+        <span class="theme-label">Light</span>
       </button>
-      <button class="toc-button" type="button" aria-expanded="false" aria-controls="toc">Sumário</button>
+      <button class="pdf-button" type="button" aria-label="Download PDF with navigation bookmarks" title="Preparing PDF" disabled>Preparing PDF</button>
+      <button class="toc-button" type="button" aria-expanded="false" aria-controls="toc">Contents</button>
     </div>
   </header>
 
   <div class="layout" id="top">
-    <aside class="toc-shell" id="toc" aria-label="Sumário do documento">
-      <p class="toc-label">Neste documento</p>
+    <aside class="toc-shell" id="toc" aria-label="Document contents">
+      <p class="toc-label">In this document</p>
       <nav class="toc-nav"></nav>
     </aside>
 
     <main class="reader">
       <article class="markdown-body">{{.Content}}</article>
-      <footer>Renderizado localmente por <span>mdo</span></footer>
+      <footer>Rendered locally by <span>mdo</span></footer>
     </main>
   </div>
 
@@ -56,12 +57,17 @@
       const tocButton = document.querySelector('.toc-button');
       const themeButton = document.querySelector('.theme-button');
       const themeLabel = themeButton.querySelector('.theme-label');
+      const pdfButton = document.querySelector('.pdf-button');
+      const pdfName = {{.PDFName}};
+      const renderingPDF = new URLSearchParams(location.search).has('pdf');
       let renderingMermaid = false;
+      let documentReady = false;
+      let pdfBlob;
 
       function updateThemeButton() {
         const light = document.documentElement.dataset.theme === 'light';
-        themeLabel.textContent = light ? 'Escuro' : 'Claro';
-        themeButton.setAttribute('aria-label', light ? 'Ativar tema escuro' : 'Ativar tema claro');
+        themeLabel.textContent = light ? 'Dark' : 'Light';
+        themeButton.setAttribute('aria-label', light ? 'Switch to dark theme' : 'Switch to light theme');
       }
 
       async function setTheme(theme) {
@@ -96,6 +102,15 @@
       });
       updateThemeButton();
 
+      pdfButton.addEventListener('click', () => {
+        if (!documentReady || !pdfBlob) return;
+        const download = document.createElement('a');
+        download.href = URL.createObjectURL(pdfBlob);
+        download.download = pdfName;
+        download.click();
+        setTimeout(() => URL.revokeObjectURL(download.href), 0);
+      });
+
       const slugCounts = new Map();
       const headings = article.querySelectorAll('h1, h2, h3');
       for (const heading of headings) {
@@ -109,7 +124,7 @@
         const anchor = document.createElement('a');
         anchor.className = 'heading-anchor';
         anchor.href = `#${heading.id}`;
-        anchor.setAttribute('aria-label', `Link para ${heading.textContent}`);
+        anchor.setAttribute('aria-label', `Link to ${heading.textContent}`);
         anchor.textContent = '#';
         heading.prepend(anchor);
 
@@ -168,13 +183,13 @@
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'copy-button';
-        button.textContent = 'Copiar';
+        button.textContent = 'Copy';
         button.addEventListener('click', async () => {
           try {
             await navigator.clipboard.writeText(code.textContent);
-            button.textContent = 'Copiado';
-            setTimeout(() => { button.textContent = 'Copiar'; }, 1400);
-          } catch { button.textContent = 'Falhou'; }
+            button.textContent = 'Copied';
+            setTimeout(() => { button.textContent = 'Copy'; }, 1400);
+          } catch { button.textContent = 'Failed'; }
         });
         shell.append(button);
       }
@@ -190,12 +205,12 @@
 
         const shell = document.createElement('section');
         shell.className = 'diagram-shell';
-        shell.setAttribute('aria-label', 'Diagrama Mermaid interativo');
+        shell.setAttribute('aria-label', 'Interactive Mermaid diagram');
         const toolbar = document.createElement('div');
         toolbar.className = 'diagram-toolbar';
         const navigation = document.createElement('div');
         navigation.className = 'diagram-navigation';
-        navigation.setAttribute('aria-label', 'Navegação do diagrama');
+        navigation.setAttribute('aria-label', 'Diagram navigation');
         const actions = document.createElement('div');
         actions.className = 'diagram-actions';
         const viewport = document.createElement('div');
@@ -218,7 +233,7 @@
           return control;
         };
 
-        const zoomLabel = button(actions, '100%', 'Restaurar zoom', () => reset(), 'zoom-label');
+        const zoomLabel = button(actions, '100%', 'Reset zoom', () => reset(), 'zoom-label');
 
         function scale() {
           return original.width / view.width;
@@ -255,15 +270,15 @@
           apply();
         }
 
-        button(navigation, '←', 'Mover diagrama para a esquerda', () => pan(-.12, 0));
-        button(navigation, '↑', 'Mover diagrama para cima', () => pan(0, -.12));
-        button(navigation, '↓', 'Mover diagrama para baixo', () => pan(0, .12));
-        button(navigation, '→', 'Mover diagrama para a direita', () => pan(.12, 0));
+        button(navigation, '←', 'Pan diagram left', () => pan(-.12, 0));
+        button(navigation, '↑', 'Pan diagram up', () => pan(0, -.12));
+        button(navigation, '↓', 'Pan diagram down', () => pan(0, .12));
+        button(navigation, '→', 'Pan diagram right', () => pan(.12, 0));
 
-        button(actions, '−', 'Diminuir zoom', () => zoom(1 / 1.25));
+        button(actions, '−', 'Zoom out', () => zoom(1 / 1.25));
         actions.append(zoomLabel);
-        button(actions, '+', 'Aumentar zoom', () => zoom(1.25));
-        button(actions, '⛶', 'Abrir em tela cheia', async () => {
+        button(actions, '+', 'Zoom in', () => zoom(1.25));
+        button(actions, '⛶', 'Open fullscreen', async () => {
           if (document.fullscreenElement === shell) {
             await document.exitFullscreen();
           } else if (shell.requestFullscreen) {
@@ -364,10 +379,27 @@
       }
 
       window.addEventListener('load', async () => {
-        try { await prepare(); }
+        try {
+          await prepare();
+          if (renderingPDF) return;
+
+          const response = await fetch(`/${token}/pdf`, {
+            headers: { 'X-MDO-Token': token },
+          });
+          if (!response.ok) throw new Error(`PDF: ${response.status}`);
+          pdfBlob = await response.blob();
+          documentReady = true;
+          pdfButton.textContent = 'Download PDF';
+          pdfButton.title = 'Download PDF with navigation bookmarks';
+          pdfButton.disabled = false;
+        }
         catch (error) {
-          console.error('mdo: não foi possível renderizar Mermaid', error);
+          console.error('mdo: could not prepare PDF', error);
+          pdfButton.textContent = 'PDF unavailable';
+          pdfButton.title = 'Could not generate PDF';
         } finally {
+          window.mdoReady = true;
+          if (renderingPDF) return;
           fetch(`/${token}/ready`, {
             method: 'POST',
             headers: { 'X-MDO-Token': token },

@@ -22,12 +22,13 @@ func TestPageIncludesDocumentAndEmbeddedAssets(t *testing.T) {
 		`README &lt;test&gt;.md`, `<h1 id="hello">Hello</h1>`,
 		`<link rel="icon" href="data:,">`,
 		`globalThis["mermaid"]`, `const token = "abc123"`,
-		`fetch(`, `enableDiagramZoom`, `Aumentar zoom`, `requestFullscreen`,
-		`Navegação do diagrama`, `Mover diagrama para a esquerda`,
+		`fetch(`, `enableDiagramZoom`, `Zoom in`, `requestFullscreen`,
+		`Diagram navigation`, `Pan diagram left`,
 		`theme-button`, `prefers-color-scheme: light`, `rerenderMermaid`,
+		`pdf-button`, `Download PDF`, `pdfBlob`, `window.mdoReady`, `/pdf`, `documentReady`,
 		`mermaidSourceWithFallback`, `#59;`,
 		`startViewTransition`, `to-light`, `to-dark`, `theme-icon-sun`,
-		`pre.mermaid`, `pre:not(.mermaid)`,
+		`pre.mermaid`, `pre:not(.mermaid)`, `@media print`, `@page { size:A4`, `break-inside:avoid`,
 		`link.getAttribute('href')`, `a[href^="#"]`, `target.scrollIntoView`,
 	} {
 		if !strings.Contains(html, expected) {

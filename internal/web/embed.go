@@ -19,6 +19,7 @@ var mermaid template.JS
 type PageData struct {
 	Title   string
 	Path    string
+	PDFName string
 	Content template.HTML
 	Token   string
 }

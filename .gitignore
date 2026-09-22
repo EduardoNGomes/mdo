@@ -13,3 +13,4 @@ npm/npm-debug.log*
 .env
 .env.*
 !.env.example
+/features/*
