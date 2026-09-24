@@ -53,6 +53,7 @@
   <script>
     (() => {
       const token = {{.Token}};
+      const layout = document.querySelector('.layout');
       const article = document.querySelector('.markdown-body');
       const toc = document.querySelector('.toc-nav');
       const tocShell = document.querySelector('.toc-shell');
@@ -149,7 +150,11 @@
         });
         toc.append(link);
       }
-      if (!headings.length) tocShell.hidden = true;
+      if (!headings.length) {
+        tocShell.hidden = true;
+        tocButton.hidden = true;
+        layout.classList.add('no-toc');
+      }
 
       tocButton.addEventListener('click', () => {
         const open = tocShell.classList.toggle('open');
@@ -175,10 +180,9 @@
           if (!target) return;
 
           event.preventDefault();
-          target.scrollIntoView({
-            behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-            block: 'start',
-          });
+          const behavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+          if (target === layout) layout.scrollTo({ top: 0, behavior });
+          else target.scrollIntoView({ behavior, block: 'start' });
           history.pushState(null, '', hash);
         });
       }
