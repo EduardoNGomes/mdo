@@ -1,0 +1,14 @@
+{
+  "name": "mdo-web-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@awesome.me/webawesome": "3.12.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}

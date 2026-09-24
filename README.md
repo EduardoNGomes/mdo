@@ -19,12 +19,35 @@
 go run . README.md
 ```
 
+The browser controls use bundled Web Awesome components. Their generated assets
+are checked in, so normal Go builds do not need Node.js. To rebuild those assets
+after changing `web-ui/components.js` or its dependencies:
+
+```bash
+cd web-ui
+npm ci
+npm run build
+```
+
 `mdo` validates the file, chooses a free local port, opens the browser, and
 shuts down the server after the page and Mermaid diagrams have rendered. The
 already loaded page remains available, but it cannot be reloaded after the
 server stops.
 
 Only files with the exact `.md` extension are accepted.
+
+### Choose a default theme
+
+Run `mdo --theme` in an interactive terminal to choose a theme without opening
+the browser. The choice is saved in `~/.config/mdo/config.json` and used the next
+time you open a document. The menu includes Default, Default light, all four
+Catppuccin flavors, Nord, all four Tokyo Night styles, Dracula Classic, and
+Alucard Classic. Without a saved choice, the reader follows your system's
+light or dark preference.
+
+You can also change the theme in the browser. That change affects only the
+current page; a dismissible toast reminds you to run `mdo --theme` to change the
+default. The dropdown, notification, and buttons work offline.
 
 ### Share temporarily over the internet
 
@@ -188,6 +211,20 @@ renderizar. A página já carregada continua disponível, mas não pode ser
 recarregada depois que o servidor encerra.
 
 Somente arquivos com extensão exata `.md` são aceitos.
+
+### Escolher o tema padrão
+
+Execute `mdo --theme` em um terminal interativo para escolher um tema sem abrir
+o navegador. A escolha é salva em `~/.config/mdo/config.json` e usada ao abrir
+outro documento. O menu inclui Default, Default light, as quatro variantes
+Catppuccin, Nord, os quatro estilos Tokyo Night, Dracula Classic e Alucard
+Classic. Sem uma escolha salva, o leitor segue a preferência de cores do
+sistema.
+
+Também é possível trocar o tema no navegador. Essa troca vale apenas para a
+página atual; uma notificação que pode ser fechada lembra você de usar
+`mdo --theme` para mudar o padrão. O seletor, a notificação e os botões
+funcionam offline.
 
 ### Compartilhar temporariamente pela internet
 

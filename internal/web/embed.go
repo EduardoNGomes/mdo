@@ -5,6 +5,8 @@ import (
 	_ "embed"
 	"fmt"
 	"html/template"
+
+	"github.com/egomes/mdo/internal/theme"
 )
 
 //go:embed page.html
@@ -16,12 +18,19 @@ var styles string
 //go:embed mermaid.min.js
 var mermaid template.JS
 
+//go:embed components.min.js
+var components template.JS
+
+//go:embed components.min.css
+var componentStyles string
+
 type PageData struct {
 	Title   string
 	Path    string
 	PDFName string
 	Content template.HTML
 	Token   string
+	Theme   string
 }
 
 func Page(data PageData) ([]byte, error) {
@@ -32,9 +41,12 @@ func Page(data PageData) ([]byte, error) {
 
 	view := struct {
 		PageData
-		Styles  template.CSS
-		Mermaid template.JS
-	}{data, template.CSS(styles), mermaid}
+		Styles          template.CSS
+		Mermaid         template.JS
+		Themes          []theme.Option
+		Components      template.JS
+		ComponentStyles template.CSS
+	}{data, template.CSS(styles), mermaid, theme.Options, components, template.CSS(componentStyles)}
 
 	var output bytes.Buffer
 	if err := tmpl.Execute(&output, view); err != nil {

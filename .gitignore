@@ -14,3 +14,4 @@ npm/npm-debug.log*
 .env.*
 !.env.example
 /features/*
+/web-ui/node_modules/
