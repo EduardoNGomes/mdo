@@ -7,8 +7,10 @@
   <link rel="icon" href="data:,">
   <title>{{.Title}} · mdo</title>
   <script>
-    document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.dataset.theme = {{.Theme}} || (matchMedia('(prefers-color-scheme: light)').matches ? 'default-light' : 'default');
+    document.documentElement.dataset.appearance = [{{range .Themes}}{{if .Light}}'{{.ID}}',{{end}}{{end}}].includes(document.documentElement.dataset.theme) ? 'light' : 'dark';
   </script>
+  <style>{{.ComponentStyles}}</style>
   <style>{{.Styles}}</style>
 </head>
 <body>
@@ -23,15 +25,13 @@
       <span title="{{.Path}}">{{.Path}}</span>
     </div>
     <div class="header-actions">
-      <button class="theme-button" type="button" aria-label="Switch to light theme" title="Toggle theme">
-        <span class="theme-icon" aria-hidden="true">
-          <span class="theme-icon-glyph theme-icon-sun">☀</span>
-          <span class="theme-icon-glyph theme-icon-moon">☾</span>
-        </span>
-        <span class="theme-label">Light</span>
-      </button>
-      <button class="pdf-button" type="button" aria-label="Download PDF with navigation bookmarks" title="Preparing PDF" disabled>Preparing PDF</button>
-      <button class="toc-button" type="button" aria-expanded="false" aria-controls="toc">Contents</button>
+      <div class="theme-control"><span aria-hidden="true">Theme</span>
+        <wa-select class="theme-select" label="Theme for this page" size="small">
+          {{range .Themes}}<wa-option value="{{.ID}}">{{.Name}}</wa-option>{{end}}
+        </wa-select>
+      </div>
+      <wa-button class="pdf-button" variant="neutral" appearance="outlined" size="small" type="button" aria-label="Download PDF with navigation bookmarks" title="Preparing PDF" disabled>Preparing PDF</wa-button>
+      <wa-button class="toc-button" variant="neutral" appearance="outlined" size="small" type="button" aria-expanded="false" aria-controls="toc">Contents</wa-button>
     </div>
   </header>
 
@@ -47,6 +47,8 @@
     </main>
   </div>
 
+  <wa-toast class="theme-toast" placement="bottom-end"></wa-toast>
+  <script>if (!new URLSearchParams(location.search).has('pdf')) { {{.Components}} }</script>
   <script>{{.Mermaid}}</script>
   <script>
     (() => {
@@ -55,8 +57,9 @@
       const toc = document.querySelector('.toc-nav');
       const tocShell = document.querySelector('.toc-shell');
       const tocButton = document.querySelector('.toc-button');
-      const themeButton = document.querySelector('.theme-button');
-      const themeLabel = themeButton.querySelector('.theme-label');
+      const themeSelect = document.querySelector('.theme-select');
+      const themeToast = document.querySelector('.theme-toast');
+      let themeNotice;
       const pdfButton = document.querySelector('.pdf-button');
       const pdfName = {{.PDFName}};
       const renderingPDF = new URLSearchParams(location.search).has('pdf');
@@ -64,21 +67,19 @@
       let documentReady = false;
       let pdfBlob;
 
-      function updateThemeButton() {
-        const light = document.documentElement.dataset.theme === 'light';
-        themeLabel.textContent = light ? 'Dark' : 'Light';
-        themeButton.setAttribute('aria-label', light ? 'Switch to dark theme' : 'Switch to light theme');
-      }
+      const lightThemes = new Set([{{range .Themes}}{{if .Light}}'{{.ID}}',{{end}}{{end}}]);
+      themeSelect.value = document.documentElement.dataset.theme;
 
       async function setTheme(theme) {
         const root = document.documentElement;
-        const direction = theme === 'light' ? 'to-light' : 'to-dark';
+        const direction = lightThemes.has(theme) ? 'to-light' : 'to-dark';
         const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
         root.dataset.themeTransition = direction;
 
         const applyTheme = async () => {
           root.dataset.theme = theme;
-          updateThemeButton();
+          root.dataset.appearance = lightThemes.has(theme) ? 'light' : 'dark';
+          themeSelect.value = theme;
           await rerenderMermaid();
         };
 
@@ -93,14 +94,24 @@
         finally { delete root.dataset.themeTransition; }
       }
 
-      themeButton.addEventListener('click', async () => {
-        if (renderingMermaid) return;
-        const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
-        themeButton.disabled = true;
-        try { await setTheme(next); }
-        finally { themeButton.disabled = false; }
+      themeSelect.addEventListener('change', async () => {
+        if (renderingMermaid) {
+          themeSelect.value = document.documentElement.dataset.theme;
+          return;
+        }
+        const next = themeSelect.value;
+        if (next === document.documentElement.dataset.theme) return;
+        themeSelect.disabled = true;
+        try {
+          try { await setTheme(next); }
+          catch (error) { console.error('mdo: could not rerender diagrams', error); }
+          if (themeNotice?.isConnected) await themeNotice.hide();
+          themeNotice = await themeToast.create(
+            '<strong>Theme changed for this page only.</strong><br>To set your default theme, run <code>mdo --theme</code> in your terminal.',
+            { allowHtml: true, variant: 'warning', duration: 10000 }
+          );
+        } finally { themeSelect.disabled = false; }
       });
-      updateThemeButton();
 
       pdfButton.addEventListener('click', () => {
         if (!documentReady || !pdfBlob) return;
@@ -180,7 +191,10 @@
         shell.className = 'code-shell';
         pre.replaceWith(shell);
         shell.append(pre);
-        const button = document.createElement('button');
+        const button = document.createElement('wa-button');
+        button.size = 'small';
+        button.variant = 'neutral';
+        button.appearance = 'outlined';
         button.type = 'button';
         button.className = 'copy-button';
         button.textContent = 'Copy';
@@ -222,7 +236,10 @@
         viewport.append(container);
 
         const button = (parent, label, title, action, className = '') => {
-          const control = document.createElement('button');
+          const control = document.createElement('wa-button');
+          control.size = 'small';
+          control.variant = 'neutral';
+          control.appearance = 'outlined';
           control.type = 'button';
           control.className = `diagram-control ${className}`.trim();
           control.textContent = label;
@@ -340,21 +357,24 @@
         const diagrams = [...article.querySelectorAll('.mermaid')];
         if (!diagrams.length || renderingMermaid) return;
         renderingMermaid = true;
-        const light = document.documentElement.dataset.theme === 'light';
+        const palette = getComputedStyle(document.documentElement);
+        const printPalette = {
+          '--bg': '#ffffff', '--surface-strong': '#f1f5f9', '--ink': '#111827',
+          '--muted': '#475569', '--accent': '#075985', '--mermaid-primary': '#f8fafc'
+        };
+        const color = name => renderingPDF ? printPalette[name] : palette.getPropertyValue(name).trim();
         try {
           mermaid.initialize({
             startOnLoad: false,
             securityLevel: 'strict',
-            theme: light ? 'neutral' : 'dark',
+            theme: 'base',
             fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
-            themeVariables: light ? {
-              primaryColor: '#e8fff4', primaryTextColor: '#0f172a',
-              primaryBorderColor: '#00a155', lineColor: '#475569',
-              secondaryColor: '#f1f5f9', tertiaryColor: '#ffffff'
-            } : {
-              primaryColor: '#0b1927', primaryTextColor: '#f8fafc',
-              primaryBorderColor: '#00dc82', lineColor: '#94a3b8',
-              secondaryColor: '#111827', tertiaryColor: '#07111f'
+            themeVariables: {
+              primaryColor: color('--mermaid-primary'), primaryTextColor: color('--ink'),
+              primaryBorderColor: color('--accent'), lineColor: color('--muted'),
+              secondaryColor: color('--surface-strong'), tertiaryColor: color('--bg'),
+              background: color('--bg'), mainBkg: color('--mermaid-primary'),
+              textColor: color('--ink'), nodeBorder: color('--accent')
             }
           });
           await mermaid.run({ nodes: diagrams, suppressErrors: false });

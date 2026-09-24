@@ -18,12 +18,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/huh"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"github.com/egomes/mdo/internal/browser"
 	"github.com/egomes/mdo/internal/document"
 	"github.com/egomes/mdo/internal/ngrok"
+	"github.com/egomes/mdo/internal/theme"
 	webassets "github.com/egomes/mdo/internal/web"
+	"github.com/mattn/go-isatty"
 )
 
 const (
@@ -33,16 +36,18 @@ const (
 )
 
 var (
-	errUsage = errors.New("usage: mdo [-l|--live] <file.md>\n       mdo --version")
+	errUsage = errors.New("usage: mdo [-l|--live] <file.md>\n       mdo --theme\n       mdo --version")
 	// Version is set by release builds with -ldflags. Development builds use dev.
 	Version      = "dev"
 	pdfGenerator = generatePDF
+	selectTheme  = promptForTheme
 )
 
 type runOptions struct {
 	markdownPath string
 	live         bool
 	version      bool
+	theme        bool
 }
 
 func Run(args []string) error {
@@ -53,6 +58,24 @@ func Run(args []string) error {
 	if options.version {
 		fmt.Println(Version)
 		return nil
+	}
+	configPath, err := theme.Path()
+	if err != nil {
+		return err
+	}
+	selectedTheme, err := theme.Load(configPath)
+	if err != nil {
+		return err
+	}
+	if options.theme {
+		choice, err := selectTheme(selectedTheme)
+		if errors.Is(err, huh.ErrUserAborted) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return theme.Save(configPath, choice)
 	}
 
 	path, source, err := readMarkdown(options.markdownPath)
@@ -76,6 +99,7 @@ func Run(args []string) error {
 		PDFName: strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)) + ".pdf",
 		Content: content,
 		Token:   token,
+		Theme:   selectedTheme,
 	})
 	if err != nil {
 		return fmt.Errorf("montar página: %w", err)
@@ -97,26 +121,47 @@ func parseArgs(args []string) (runOptions, error) {
 	for _, arg := range args {
 		switch arg {
 		case "--version", "-v":
-			if options.version || options.markdownPath != "" || options.live {
+			if options.version || options.markdownPath != "" || options.live || options.theme {
 				return runOptions{}, errUsage
 			}
 			options.version = true
 		case "-l", "--live":
-			if options.version {
+			if options.version || options.theme {
 				return runOptions{}, errUsage
 			}
 			options.live = true
+		case "--theme":
+			if options.theme || options.version || options.live || options.markdownPath != "" {
+				return runOptions{}, errUsage
+			}
+			options.theme = true
 		default:
-			if strings.HasPrefix(arg, "-") || options.markdownPath != "" || options.version {
+			if strings.HasPrefix(arg, "-") || options.markdownPath != "" || options.version || options.theme {
 				return runOptions{}, errUsage
 			}
 			options.markdownPath = arg
 		}
 	}
-	if !options.version && options.markdownPath == "" {
+	if !options.version && !options.theme && options.markdownPath == "" {
 		return runOptions{}, errUsage
 	}
 	return options, nil
+}
+
+func promptForTheme(current string) (string, error) {
+	if !isatty.IsTerminal(os.Stdin.Fd()) {
+		return "", errors.New("mdo --theme requires an interactive terminal")
+	}
+	if current == "" {
+		current = "default"
+	}
+	options := make([]huh.Option[string], 0, len(theme.Options))
+	for _, option := range theme.Options {
+		options = append(options, huh.NewOption(option.Name, option.ID))
+	}
+	choice := current
+	err := huh.NewForm(huh.NewGroup(huh.NewSelect[string]().Title("Default theme").Options(options...).Value(&choice))).Run()
+	return choice, err
 }
 
 func readMarkdown(input string) (string, []byte, error) {
@@ -313,7 +358,7 @@ func setSecurityHeaders(w http.ResponseWriter) {
 		"style-src 'unsafe-inline'",
 		"img-src 'self' data: https: http:",
 		"font-src data:",
-		"connect-src 'self'",
+		"connect-src 'self' data:",
 	}, "; "))
 }
 
