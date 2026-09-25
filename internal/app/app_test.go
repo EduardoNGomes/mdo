@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"html/template"
 	"net/http"
@@ -18,37 +17,10 @@ import (
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
+	"github.com/egomes/mdo/internal/document"
 	"github.com/egomes/mdo/internal/theme"
 	"github.com/egomes/mdo/internal/web"
 )
-
-func TestGeneratePDF(t *testing.T) {
-	if os.Getenv("CI") != "" {
-		t.Skip("headless Chrome sandbox is unavailable in CI")
-	}
-	if !chromeAvailable() {
-		t.Skip("no Chrome-compatible browser is installed")
-	}
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte(`<!doctype html><h1>Documento</h1><h2>Seção</h2><script>window.mdoReady = true</script>`))
-	}))
-	defer server.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), pdfTimeout)
-	defer cancel()
-	pdf, err := generatePDF(ctx, server.URL)
-	if err != nil {
-		t.Fatalf("generatePDF() error = %v", err)
-	}
-	if !bytes.HasPrefix(pdf, []byte("%PDF-")) {
-		t.Fatalf("generatePDF() returned %q, want a PDF", pdf[:min(len(pdf), 8)])
-	}
-	if !bytes.Contains(pdf, []byte("/Outlines")) {
-		t.Error("generatePDF() did not embed a document outline")
-	}
-}
 
 func chromeAvailable() bool {
 	for _, name := range []string{"google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "brave", "brave-browser", "msedge"} {
@@ -57,6 +29,82 @@ func chromeAvailable() bool {
 		}
 	}
 	return false
+}
+
+func TestBrowserPrintAfterServerCloses(t *testing.T) {
+	if os.Getenv("CI") != "" || !chromeAvailable() {
+		t.Skip("headless Chrome is unavailable")
+	}
+	for _, source := range []string{"# Plain document", "# Diagram\n\n```mermaid\nflowchart LR\nA-->B\n```"} {
+		t.Run(source[:7], func(t *testing.T) {
+			content, err := document.Render([]byte(source))
+			if err != nil {
+				t.Fatal(err)
+			}
+			html, err := web.Page(web.PageData{Title: "Print", Token: "test", Theme: "dracula-classic", Content: content})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var mu sync.Mutex
+			var requests []string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				requests = append(requests, r.URL.Path)
+				mu.Unlock()
+				if r.URL.Path == "/test/ready" {
+					w.WriteHeader(http.StatusNoContent)
+					return
+				}
+				setSecurityHeaders(w)
+				w.Header().Set("Content-Type", "text/html")
+				w.Write(html)
+			}))
+			defer server.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			ctx, closeBrowser := chromedp.NewContext(ctx)
+			defer closeBrowser()
+			if err := chromedp.Run(ctx, chromedp.Navigate(server.URL), chromedp.Poll(`window.mdoReady === true`, nil)); err != nil {
+				t.Fatal(err)
+			}
+			server.Close()
+			var result struct {
+				Calls    int
+				Restored bool
+				Light    bool
+				Ready    bool
+				Theme    string
+			}
+			if err := chromedp.Run(ctx,
+				chromedp.Evaluate(`window.originalDiagram = document.querySelector('.diagram-shell');
+     const svg = window.originalDiagram?.querySelector('svg');
+     if (svg) svg.setAttribute('viewBox', '1 2 30 40');
+     window.printCalls = 0;
+     window.print = () => {
+       window.printCalls++;
+       const rect = document.querySelector('.mermaid svg .node rect');
+       window.printLight = !rect || getComputedStyle(rect).fill === 'rgb(248, 250, 252)';
+     };
+     document.querySelector('.pdf-button').click();`, nil),
+				chromedp.Poll(`window.printCalls === 1 && !document.querySelector('.pdf-button').disabled`, nil),
+				chromedp.Evaluate(`({Calls:window.printCalls, Light:window.printLight,
+     Restored:document.querySelector('.diagram-shell') === window.originalDiagram && (!window.originalDiagram || window.originalDiagram.querySelector('svg').getAttribute('viewBox') === '1 2 30 40'),
+     Ready:window.mdoReady, Theme:document.documentElement.dataset.theme})`, &result),
+			); err != nil {
+				t.Fatal(err)
+			}
+			if result.Calls != 1 || !result.Restored || !result.Light || !result.Ready || result.Theme != "dracula-classic" {
+				t.Fatalf("print state: %+v", result)
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			for _, path := range requests {
+				if strings.HasSuffix(path, "/pdf") {
+					t.Errorf("unexpected PDF request: %s", path)
+				}
+			}
+		})
+	}
 }
 
 func TestReadMarkdown(t *testing.T) {
@@ -331,12 +379,6 @@ func TestBrowserThemeSelection(t *testing.T) {
 	}
 	if reloaded != "catppuccin-latte" {
 		t.Errorf("theme after reload = %q, want saved CLI choice", reloaded)
-	}
-	pdfContext, cancelPDF := context.WithTimeout(context.Background(), pdfTimeout)
-	defer cancelPDF()
-	pdf, err := generatePDF(pdfContext, server.URL+"?pdf=1")
-	if err != nil || !bytes.HasPrefix(pdf, []byte("%PDF-")) {
-		t.Fatalf("themed PDF = %d bytes, %v", len(pdf), err)
 	}
 	// The one-shot server normally closes once the page is prepared. Components
 	// must remain fully interactive without fetching JavaScript, CSS, or icons.

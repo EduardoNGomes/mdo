@@ -30,7 +30,6 @@ var mermaidCode = regexp.MustCompile(`<code\s+class=(?:"language-mermaid"|'langu
 type PageData struct {
 	Title   string
 	Path    string
-	PDFName string
 	Content template.HTML
 	Token   string
 	Theme   string
