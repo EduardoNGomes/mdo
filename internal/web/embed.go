@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"html/template"
+	"regexp"
 
 	"github.com/egomes/mdo/internal/theme"
 )
@@ -24,10 +25,11 @@ var components template.JS
 //go:embed components.min.css
 var componentStyles string
 
+var mermaidCode = regexp.MustCompile(`<code\s+class=(?:"language-mermaid"|'language-mermaid'|language-mermaid)[\s>]`)
+
 type PageData struct {
 	Title   string
 	Path    string
-	PDFName string
 	Content template.HTML
 	Token   string
 	Theme   string
@@ -47,6 +49,11 @@ func Page(data PageData) ([]byte, error) {
 		Components      template.JS
 		ComponentStyles template.CSS
 	}{data, template.CSS(styles), mermaid, theme.Options, components, template.CSS(componentStyles)}
+	// Goldmark emits this class for fenced Mermaid blocks. Inspect the rendered
+	// content so mentions of Mermaid in prose or escaped code don't load the bundle.
+	if !mermaidCode.MatchString(string(data.Content)) {
+		view.Mermaid = ""
+	}
 
 	var output bytes.Buffer
 	if err := tmpl.Execute(&output, view); err != nil {

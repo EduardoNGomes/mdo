@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/egomes/mdo/internal/document"
 	"github.com/egomes/mdo/internal/theme"
 )
 
@@ -12,7 +13,7 @@ func TestPageIncludesDocumentAndEmbeddedAssets(t *testing.T) {
 	page, err := Page(PageData{
 		Title:   `README <test>.md`,
 		Path:    `/tmp/README <test>.md`,
-		Content: template.HTML(`<h1 id="hello">Hello</h1>`),
+		Content: template.HTML(`<h1 id="hello">Hello</h1><pre><code class="language-mermaid">flowchart LR</code></pre>`),
 		Token:   "abc123",
 		Theme:   "tokyo-night-moon",
 	})
@@ -24,13 +25,13 @@ func TestPageIncludesDocumentAndEmbeddedAssets(t *testing.T) {
 	for _, expected := range []string{
 		`README &lt;test&gt;.md`, `<h1 id="hello">Hello</h1>`,
 		`<link rel="icon" href="data:,">`,
-		`globalThis["mermaid"]`, `const token = "abc123"`,
+		`const token = "abc123"`,
 		`fetch(`, `enableDiagramZoom`, `Zoom in`, `requestFullscreen`,
 		`Diagram navigation`, `Pan diagram left`,
 		`theme-select`, `prefers-color-scheme: light`, `rerenderMermaid`,
 		`<wa-select`, `<wa-toast`, `<wa-button`, `themeToast.create`,
 		`dataset.theme = "tokyo-night-moon"`, `Theme changed for this page only`, `mdo --theme`,
-		`pdf-button`, `Download PDF`, `pdfBlob`, `window.mdoReady`, `/pdf`, `documentReady`,
+		`pdf-button`, `Print / PDF`, `window.print()`, `window.mdoReady`, `documentReady`,
 		`mermaidSourceWithFallback`, `#59;`,
 		`startViewTransition`, `to-light`, `to-dark`,
 		`pre.mermaid`, `pre:not(.mermaid)`, `@media print`, `@page { size:A4`, `break-inside:avoid`,
@@ -53,5 +54,37 @@ func TestPageIncludesDocumentAndEmbeddedAssets(t *testing.T) {
 	}
 	if strings.Contains(html, `test(link.href)`) {
 		t.Error("Page() classifies resolved fragment URLs as external links")
+	}
+}
+
+func TestPageIncludesMermaidOnlyForDiagrams(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		source      string
+		wantMermaid bool
+	}{
+		{"plain", "# Hello\n\nA simple document.", false},
+		{"mention", "Use `mermaid` diagrams and `language-mermaid` blocks.", false},
+		{"escaped HTML", "```text\n<code class=\"language-mermaid\">\n```", false},
+		{"diagram", "```mermaid\nflowchart LR\n A --> B\n```", true},
+		{"tilde fence", "~~~mermaid\nflowchart LR\n A --> B\n~~~", true},
+		{"nested diagram", "> ```mermaid\n> flowchart LR\n> A --> B\n> ```", true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			content, err := document.Render([]byte(tt.source))
+			if err != nil {
+				t.Fatal(err)
+			}
+			page, err := Page(PageData{Content: content})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := strings.Contains(string(page), string(mermaid)); got != tt.wantMermaid {
+				t.Errorf("Mermaid bundle present = %v, want %v", got, tt.wantMermaid)
+			}
+			if !tt.wantMermaid && len(page) > 400_000 {
+				t.Errorf("page without diagrams grew to %d bytes", len(page))
+			}
+		})
 	}
 }

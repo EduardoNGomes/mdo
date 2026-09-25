@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"html/template"
 	"net/http"
@@ -18,37 +17,10 @@ import (
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
+	"github.com/egomes/mdo/internal/document"
 	"github.com/egomes/mdo/internal/theme"
 	"github.com/egomes/mdo/internal/web"
 )
-
-func TestGeneratePDF(t *testing.T) {
-	if os.Getenv("CI") != "" {
-		t.Skip("headless Chrome sandbox is unavailable in CI")
-	}
-	if !chromeAvailable() {
-		t.Skip("no Chrome-compatible browser is installed")
-	}
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte(`<!doctype html><h1>Documento</h1><h2>Seção</h2><script>window.mdoReady = true</script>`))
-	}))
-	defer server.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), pdfTimeout)
-	defer cancel()
-	pdf, err := generatePDF(ctx, server.URL)
-	if err != nil {
-		t.Fatalf("generatePDF() error = %v", err)
-	}
-	if !bytes.HasPrefix(pdf, []byte("%PDF-")) {
-		t.Fatalf("generatePDF() returned %q, want a PDF", pdf[:min(len(pdf), 8)])
-	}
-	if !bytes.Contains(pdf, []byte("/Outlines")) {
-		t.Error("generatePDF() did not embed a document outline")
-	}
-}
 
 func chromeAvailable() bool {
 	for _, name := range []string{"google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "brave", "brave-browser", "msedge"} {
@@ -57,6 +29,82 @@ func chromeAvailable() bool {
 		}
 	}
 	return false
+}
+
+func TestBrowserPrintAfterServerCloses(t *testing.T) {
+	if os.Getenv("CI") != "" || !chromeAvailable() {
+		t.Skip("headless Chrome is unavailable")
+	}
+	for _, source := range []string{"# Plain document", "# Diagram\n\n```mermaid\nflowchart LR\nA-->B\n```"} {
+		t.Run(source[:7], func(t *testing.T) {
+			content, err := document.Render([]byte(source))
+			if err != nil {
+				t.Fatal(err)
+			}
+			html, err := web.Page(web.PageData{Title: "Print", Token: "test", Theme: "dracula-classic", Content: content})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var mu sync.Mutex
+			var requests []string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				requests = append(requests, r.URL.Path)
+				mu.Unlock()
+				if r.URL.Path == "/test/ready" {
+					w.WriteHeader(http.StatusNoContent)
+					return
+				}
+				setSecurityHeaders(w)
+				w.Header().Set("Content-Type", "text/html")
+				w.Write(html)
+			}))
+			defer server.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			ctx, closeBrowser := chromedp.NewContext(ctx)
+			defer closeBrowser()
+			if err := chromedp.Run(ctx, chromedp.Navigate(server.URL), chromedp.Poll(`window.mdoReady === true`, nil)); err != nil {
+				t.Fatal(err)
+			}
+			server.Close()
+			var result struct {
+				Calls    int
+				Restored bool
+				Light    bool
+				Ready    bool
+				Theme    string
+			}
+			if err := chromedp.Run(ctx,
+				chromedp.Evaluate(`window.originalDiagram = document.querySelector('.diagram-shell');
+     const svg = window.originalDiagram?.querySelector('svg');
+     if (svg) svg.setAttribute('viewBox', '1 2 30 40');
+     window.printCalls = 0;
+     window.print = () => {
+       window.printCalls++;
+       const rect = document.querySelector('.mermaid svg .node rect');
+       window.printLight = !rect || getComputedStyle(rect).fill === 'rgb(248, 250, 252)';
+     };
+     document.querySelector('.pdf-button').click();`, nil),
+				chromedp.Poll(`window.printCalls === 1 && !document.querySelector('.pdf-button').disabled`, nil),
+				chromedp.Evaluate(`({Calls:window.printCalls, Light:window.printLight,
+     Restored:document.querySelector('.diagram-shell') === window.originalDiagram && (!window.originalDiagram || window.originalDiagram.querySelector('svg').getAttribute('viewBox') === '1 2 30 40'),
+     Ready:window.mdoReady, Theme:document.documentElement.dataset.theme})`, &result),
+			); err != nil {
+				t.Fatal(err)
+			}
+			if result.Calls != 1 || !result.Restored || !result.Light || !result.Ready || result.Theme != "dracula-classic" {
+				t.Fatalf("print state: %+v", result)
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			for _, path := range requests {
+				if strings.HasSuffix(path, "/pdf") {
+					t.Errorf("unexpected PDF request: %s", path)
+				}
+			}
+		})
+	}
 }
 
 func TestReadMarkdown(t *testing.T) {
@@ -332,12 +380,6 @@ func TestBrowserThemeSelection(t *testing.T) {
 	if reloaded != "catppuccin-latte" {
 		t.Errorf("theme after reload = %q, want saved CLI choice", reloaded)
 	}
-	pdfContext, cancelPDF := context.WithTimeout(context.Background(), pdfTimeout)
-	defer cancelPDF()
-	pdf, err := generatePDF(pdfContext, server.URL+"?pdf=1")
-	if err != nil || !bytes.HasPrefix(pdf, []byte("%PDF-")) {
-		t.Fatalf("themed PDF = %d bytes, %v", len(pdf), err)
-	}
 	// The one-shot server normally closes once the page is prepared. Components
 	// must remain fully interactive without fetching JavaScript, CSS, or icons.
 	server.Close()
@@ -357,5 +399,79 @@ func TestBrowserThemeSelection(t *testing.T) {
 	defer requestMu.Unlock()
 	if len(externalRequests) > 0 {
 		t.Errorf("components requested external assets: %v", externalRequests)
+	}
+}
+
+func TestBrowserMarkdownEnhancements(t *testing.T) {
+	if os.Getenv("CI") != "" || !chromeAvailable() {
+		t.Skip("headless Chrome is unavailable")
+	}
+	source := "> [!NOTE]+ **TODO**\n> Migrate tasks here?\n\n> [!WARNING]- Careful\n> Hidden body\n>\n> > [!TIP]\n> > Nested body\n\n- [x] Parent **done**\n    - [ ] Child pending\n- [ ] Pending\n\n> Normal quote\n\n```text\n[!NOTE] not a callout\n```\n\n| A | B |\n| - | - |\n| one | ~~two~~ |\n"
+	content, err := document.Render([]byte(source))
+	if err != nil {
+		t.Fatal(err)
+	}
+	html, err := web.Page(web.PageData{Title: "Markdown", Content: content, Token: "test", Theme: "default"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		setSecurityHeaders(w)
+		w.Header().Set("Content-Type", "text/html")
+		w.Write(html)
+	}))
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	ctx, closeBrowser := chromedp.NewContext(ctx)
+	defer closeBrowser()
+	var state struct {
+		Callouts    int
+		Open        bool
+		Closed      bool
+		Body        bool
+		Bold        bool
+		Nested      bool
+		Tasks       int
+		Completed   int
+		ChildStyle  string
+		ParentStyle string
+		Quote       bool
+		Code        bool
+		Table       bool
+		PrintOpen   bool
+		Restored    bool
+		Keyboard    bool
+	}
+	if err := chromedp.Run(ctx,
+		chromedp.Navigate(server.URL), chromedp.Poll(`window.mdoReady === true`, nil),
+		chromedp.Evaluate(`(() => {
+		 const article = document.querySelector('article');
+		 const first = article.querySelector('.callout');
+		 const folded = article.querySelector('details:not([open])');
+		 const tasks = article.querySelectorAll('.task-item');
+		 const state = {Callouts:article.querySelectorAll('.callout').length, Open:first.open, Closed:!folded.open,
+		 Body:first.querySelector('.callout-body').textContent.trim() === 'Migrate tasks here?', Bold:first.querySelector('.callout-title strong').textContent === 'TODO',
+		 Nested:!!folded.querySelector('.callout-success'), Tasks:tasks.length, Completed:article.querySelectorAll('.task-completed').length,
+		 ChildStyle:getComputedStyle(tasks[1].querySelector('.task-label')).textDecorationLine,
+		 ParentStyle:getComputedStyle(tasks[0].querySelector('.task-label')).textDecorationLine,
+		 Quote:article.querySelector('blockquote').textContent.trim() === 'Normal quote',
+		 Code:article.querySelector('pre code').textContent.includes('[!NOTE] not a callout'), Table:!!article.querySelector('table del')};
+		 window.dispatchEvent(new Event('beforeprint')); state.PrintOpen=folded.open;
+		 window.dispatchEvent(new Event('afterprint')); state.Restored=!folded.open && first.open;
+		 folded.querySelector('summary').focus();
+		 return state;
+		})()`, &state),
+		chromedp.KeyEvent(kb.Enter),
+		chromedp.Evaluate(`document.querySelector('details.callout-warning').open`, &state.Keyboard),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if state.Callouts != 3 || !state.Open || !state.Closed || !state.Body || !state.Bold || !state.Nested || state.Tasks != 3 || state.Completed != 1 || state.ChildStyle != "none" || state.ParentStyle != "line-through" || !state.Quote || !state.Code || !state.Table || !state.PrintOpen || !state.Restored || !state.Keyboard {
+		t.Fatalf("Markdown state: %+v", state)
 	}
 }

@@ -77,21 +77,24 @@ continues to run only on localhost and does not look for or require ngrok.
 
 - CommonMark and GitHub Flavored Markdown
 - tables, task lists, autolinks, and strikethrough text
+- nested task lists with completed labels struck through
+- GitHub-style alerts and Obsidian-style callouts, including foldable titles
 - footnotes and definition lists
 - syntax highlighting
 - table of contents and heading links
 - code block copying
 - offline Mermaid diagrams
 - images relative to the Markdown file
-- PDF download with heading bookmarks (requires a Chrome-compatible browser)
+- print or save as PDF using your browser
 
 ### PDF export
 
-After the document and its Mermaid diagrams load, use **Download PDF**. `mdo`
-uses a local headless Chrome-compatible browser to produce the download, so
-its headings appear as bookmarks in supporting PDF viewers. Chrome, Chromium,
-Brave, and Microsoft Edge are supported; install one of them if PDF export is
-unavailable. The normal document view may still use any default browser.
+After the document loads, click **Print / PDF** and choose **Save as PDF** in
+your browser's print dialog. Export works after `mdo` exits, without a separate
+Chrome installation. The button prepares diagrams with a light print palette
+and restores their interactive view after printing or cancellation. Paper size,
+margins, backgrounds, and heading bookmarks depend on the browser and its print
+settings. No PDF is generated during startup.
 
 ### Install from a release
 
@@ -260,16 +263,16 @@ continua funcionando somente em localhost e não procura nem exige o ngrok.
 - cópia de blocos de código
 - diagramas Mermaid offline
 - imagens relativas ao arquivo Markdown
-- download de PDF com marcadores de títulos (requer navegador compatível com Chrome)
+- impressão ou exportação em PDF pelo navegador
 
 ### Exportação de PDF
 
-Depois que o documento e os diagramas Mermaid carregarem, use **Download PDF**.
-O `mdo` usa localmente um navegador compatível com Chrome em modo headless
-para gerar o download, para que os títulos apareçam como marcadores em leitores
-de PDF compatíveis. Chrome, Chromium, Brave e Microsoft Edge são suportados;
-instale um deles caso a exportação esteja indisponível. A visualização normal
-do documento pode continuar usando qualquer navegador padrão.
+Depois que o documento carregar, clique em **Print / PDF** e escolha **Salvar
+como PDF** no diálogo de impressão do navegador. A exportação funciona após o
+`mdo` encerrar, sem uma instalação separada do Chrome. O botão prepara os
+diagramas com uma paleta clara e restaura a visualização interativa após imprimir
+ou cancelar. Papel, margens, fundos e marcadores de títulos dependem do navegador
+e das configurações de impressão. Nenhum PDF é gerado durante a abertura.
 
 ### Instalação por release
 
@@ -371,3 +374,23 @@ flowchart LR
     B --> C[Navegador]
     C --> D[Servidor encerrado]
 ```
+
+### Callouts / Blocos de destaque
+
+```markdown
+> [!NOTE]+ TODO
+> Migrate dotfiles tasks from Notion to here?
+
+> [!WARNING]- Details / Detalhes
+> Expand to read / Expanda para ler.
+```
+
+Supported syntax follows [Obsidian callouts](https://help.obsidian.md/callouts):
+`+` starts expanded, `-` starts collapsed, and no sign creates a static callout.
+Titles support inline Markdown. Callouts expand for printing and return to their
+previous state afterwards. Task checkboxes are read-only; the source file is not edited.
+
+A sintaxe segue os callouts do Obsidian: `+` começa aberto, `-` começa recolhido
+e sem sinal cria um bloco fixo. Os títulos aceitam Markdown inline. Na impressão,
+os blocos são expandidos e depois retornam ao estado anterior. As caixas de tarefas
+são apenas para leitura; o arquivo original não é alterado.

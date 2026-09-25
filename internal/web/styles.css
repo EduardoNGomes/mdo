@@ -146,7 +146,40 @@ h1:hover .heading-anchor, h2:hover .heading-anchor, h3:hover .heading-anchor, .h
 .markdown-body blockquote p { color: #b9c7d8; }
 .markdown-body ul, .markdown-body ol { padding-left: 1.55rem; }
 .markdown-body li + li { margin-top: .35rem; }
-.markdown-body input[type="checkbox"] { width: 1rem; height: 1rem; margin: 0 .45rem 0 0; accent-color: var(--accent); }
+/* Task labels are separate from child lists so completion never crosses levels. */
+.markdown-body li.task-item { position:relative; list-style:none; }
+.markdown-body .task-item > input[type="checkbox"], .markdown-body .task-item > p > input[type="checkbox"] { position:absolute; left:-1.5rem; top:.36em; width:1rem; height:1rem; margin:0; accent-color:var(--accent); opacity:1; }
+.markdown-body .task-item input[type="checkbox"] { appearance:none; border:1px solid var(--border); border-radius:3px; background:transparent; }
+.markdown-body .task-item input[type="checkbox"]:checked { border-color:var(--accent); background-color:var(--accent); background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3 8 3 3 7-7' fill='none' stroke='%230b1620' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.markdown-body .task-item > p { position:relative; }
+.markdown-body .task-item > ul, .markdown-body .task-item > ol { margin-top:.35rem; margin-bottom:.35rem; }
+.markdown-body .task-completed > .task-label, .markdown-body .task-completed > p > .task-label { color:var(--muted); text-decoration:line-through; }
+.markdown-body .task-completed > .task-label :is(a, code, strong), .markdown-body .task-completed > p > .task-label :is(a, code, strong) { color:inherit; }
+.markdown-body .callout { --callout-color:#38bdf8; margin:1.5rem 0; border:1px solid color-mix(in srgb,var(--callout-color) 28%,var(--border)); border-radius:8px; background:color-mix(in srgb,var(--callout-color) 8%,var(--surface)); overflow:hidden; }
+.markdown-body > .callout:first-child { margin-top:0; }
+.markdown-body .callout-success { --callout-color:#34d399; }
+.markdown-body .callout-important { --callout-color:#a78bfa; }
+.markdown-body .callout-warning { --callout-color:#fbbf24; }
+.markdown-body .callout-danger { --callout-color:#fb7185; }
+.markdown-body .callout-quote { --callout-color:var(--muted); }
+.markdown-body .callout-title { display:flex; align-items:baseline; gap:.65rem; padding:.85rem 1rem; color:var(--callout-color); font-weight:700; line-height:1.5; }
+.markdown-body summary.callout-title { cursor:pointer; list-style:none; }
+.markdown-body summary.callout-title::-webkit-details-marker { display:none; }
+.markdown-body summary.callout-title::after { content:'›'; margin-left:auto; transform:rotate(0deg); }
+.markdown-body details[open] > summary.callout-title::after { transform:rotate(90deg); }
+.markdown-body summary.callout-title:focus-visible { outline:2px solid var(--callout-color); outline-offset:-3px; }
+.markdown-body .callout-icon { flex:none; }
+.markdown-body .callout-body { padding:0 1rem .85rem; }
+.markdown-body .callout-body > :first-child { margin-top:0; }
+.markdown-body .callout-body > :last-child { margin-bottom:0; }
+.markdown-body .callout-title :is(strong, a, code) { color:inherit; }
+:root[data-appearance="light"] .callout-info, :root[data-appearance="light"] .callout { --callout-color:#0369a1; }
+:root[data-appearance="light"] .callout-success { --callout-color:#047857; }
+:root[data-appearance="light"] .callout-important { --callout-color:#7c3aed; }
+:root[data-appearance="light"] .callout-warning { --callout-color:#92400e; }
+:root[data-appearance="light"] .callout-danger { --callout-color:#be123c; }
+:root[data-appearance="light"] .callout-quote { --callout-color:var(--muted); }
+
 
 .markdown-body table { display: block; width: 100%; margin: 1.5rem 0; overflow-x: auto; border-spacing: 0; border-collapse: collapse; }
 .markdown-body th, .markdown-body td { min-width: 9rem; padding: .75rem .9rem; border: 1px solid var(--border); text-align: left; }
@@ -542,6 +575,8 @@ wa-button::part(base):hover { border-color:var(--accent); }
   .markdown-body table { overflow:visible; }
   .markdown-body thead { display:table-header-group; }
   .markdown-body img, .markdown-body blockquote, .markdown-body pre, .markdown-body table, .diagram-shell { break-inside:avoid; page-break-inside:avoid; }
+  .callout { break-inside:avoid; print-color-adjust:exact; }
+  .callout-title { color:#075985!important; }
   .diagram-shell { overflow:visible; border:1px solid var(--border); background:#fff; }
   .diagram-viewport { min-height:0; padding:1rem; overflow:visible; }
   .mermaid, .mermaid svg { max-width:100%; height:auto; }

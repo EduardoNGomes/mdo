@@ -30,7 +30,7 @@
           {{range .Themes}}<wa-option value="{{.ID}}">{{.Name}}</wa-option>{{end}}
         </wa-select>
       </div>
-      <wa-button class="pdf-button" variant="neutral" appearance="outlined" size="small" type="button" aria-label="Download PDF with navigation bookmarks" title="Preparing PDF" disabled>Preparing PDF</wa-button>
+      <wa-button class="pdf-button" variant="neutral" appearance="outlined" size="small" type="button" aria-label="Print or save as PDF" title="Print or save as PDF" disabled>Print / PDF</wa-button>
       <wa-button class="toc-button" variant="neutral" appearance="outlined" size="small" type="button" aria-expanded="false" aria-controls="toc">Contents</wa-button>
     </div>
   </header>
@@ -48,8 +48,8 @@
   </div>
 
   <wa-toast class="theme-toast" placement="bottom-end"></wa-toast>
-  <script>if (!new URLSearchParams(location.search).has('pdf')) { {{.Components}} }</script>
-  <script>{{.Mermaid}}</script>
+  <script>{{.Components}}</script>
+  {{if .Mermaid}}<script>{{.Mermaid}}</script>{{end}}
   <script>
     (() => {
       const token = {{.Token}};
@@ -62,11 +62,9 @@
       const themeToast = document.querySelector('.theme-toast');
       let themeNotice;
       const pdfButton = document.querySelector('.pdf-button');
-      const pdfName = {{.PDFName}};
-      const renderingPDF = new URLSearchParams(location.search).has('pdf');
+      let renderingForPrint = false;
       let renderingMermaid = false;
       let documentReady = false;
-      let pdfBlob;
 
       const lightThemes = new Set([{{range .Themes}}{{if .Light}}'{{.ID}}',{{end}}{{end}}]);
       themeSelect.value = document.documentElement.dataset.theme;
@@ -114,13 +112,120 @@
         } finally { themeSelect.disabled = false; }
       });
 
-      pdfButton.addEventListener('click', () => {
-        if (!documentReady || !pdfBlob) return;
-        const download = document.createElement('a');
-        download.href = URL.createObjectURL(pdfBlob);
-        download.download = pdfName;
-        download.click();
-        setTimeout(() => URL.revokeObjectURL(download.href), 0);
+      pdfButton.addEventListener('click', async () => {
+        if (!documentReady || renderingMermaid || renderingForPrint) return;
+        const originals = [...article.querySelectorAll('.diagram-shell')];
+        renderingForPrint = true;
+        pdfButton.disabled = true;
+        themeSelect.disabled = true;
+        try {
+          // Preserve the interactive diagrams (including zoom and listeners).
+          // Only the temporary copies use the light print palette and full view.
+          for (const shell of originals) {
+            const diagram = document.createElement('pre');
+            diagram.className = 'mermaid';
+            diagram.textContent = shell.querySelector('.mermaid').dataset.mermaidSource;
+            diagram.dataset.mermaidSource = diagram.textContent;
+            shell.replaceWith(diagram);
+          }
+          await renderMermaid();
+          await document.fonts.ready;
+          window.print();
+        } catch (error) {
+          console.error('mdo: could not prepare printing', error);
+        } finally {
+          const copies = [...article.querySelectorAll('.diagram-shell, pre.mermaid')]
+            .filter(node => !node.closest('.diagram-shell') || node.matches('.diagram-shell'));
+          copies.forEach((copy, index) => { if (originals[index]) copy.replaceWith(originals[index]); });
+          renderingForPrint = false;
+          pdfButton.disabled = false;
+          themeSelect.disabled = false;
+        }
+      });
+
+      // Enhance Goldmark's safe HTML without reparsing Markdown or using innerHTML.
+      const calloutTypes = {
+        note: ['Note', 'ⓘ', 'info'], info: ['Info', 'ⓘ', 'info'],
+        todo: ['Todo', '☐', 'info'], tip: ['Tip', '◇', 'success'],
+        hint: ['Hint', '◇', 'success'], success: ['Success', '✓', 'success'],
+        check: ['Check', '✓', 'success'], done: ['Done', '✓', 'success'],
+        important: ['Important', '!', 'important'], example: ['Example', '◇', 'important'],
+        warning: ['Warning', '!', 'warning'], caution: ['Caution', '!', 'danger'],
+        attention: ['Attention', '!', 'warning'], danger: ['Danger', '!', 'danger'],
+        error: ['Error', '!', 'danger'], failure: ['Failure', '×', 'danger'],
+        fail: ['Fail', '×', 'danger'], missing: ['Missing', '×', 'danger'],
+        bug: ['Bug', '!', 'danger'], question: ['Question', '?', 'warning'],
+        help: ['Help', '?', 'warning'], faq: ['FAQ', '?', 'warning'],
+        abstract: ['Abstract', '≡', 'info'], summary: ['Summary', '≡', 'info'],
+        tldr: ['TLDR', '≡', 'info'], quote: ['Quote', '❝', 'quote'], cite: ['Cite', '❝', 'quote']
+      };
+      for (const quote of [...article.querySelectorAll('blockquote')].reverse()) {
+        const paragraph = quote.firstElementChild;
+        const first = paragraph?.firstChild;
+        if (paragraph?.tagName !== 'P' || first?.nodeType !== Node.TEXT_NODE) continue;
+        const marker = first.textContent.match(/^\[!([a-z][a-z0-9-]*)\]([+-]?)[ \t]*/i);
+        if (!marker) continue;
+        const type = marker[1].toLowerCase();
+        const [label, symbol, tone] = calloutTypes[type] || calloutTypes.note;
+        first.deleteData(0, marker[0].length);
+        const callout = document.createElement(marker[2] ? 'details' : 'div');
+        callout.className = `callout callout-${tone}`;
+        callout.dataset.callout = type;
+        if (marker[2] === '+') callout.open = true;
+        const title = document.createElement(marker[2] ? 'summary' : 'div');
+        title.className = 'callout-title';
+        const icon = document.createElement('span');
+        icon.className = 'callout-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = symbol;
+        const titleText = document.createElement('span');
+        const range = document.createRange();
+        range.setStart(paragraph, 0);
+        range.setEnd(paragraph, paragraph.childNodes.length);
+        const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+        let boundary;
+        while (boundary = walker.nextNode()) {
+          if (boundary.nodeType === Node.TEXT_NODE && boundary.textContent.includes('\n')) {
+            range.setEnd(boundary, boundary.textContent.indexOf('\n'));
+            break;
+          }
+          if (boundary.nodeName === 'BR') { range.setEndBefore(boundary); break; }
+        }
+        titleText.append(range.extractContents());
+        if (boundary?.nodeName === 'BR') boundary.remove();
+        else if (boundary) boundary.deleteData(0, 1);
+        if (!titleText.textContent.trim()) titleText.textContent = label;
+        title.append(icon, titleText);
+        if (!paragraph.textContent.trim() && !paragraph.querySelector('img')) paragraph.remove();
+        const body = document.createElement('div');
+        body.className = 'callout-body';
+        body.append(...quote.childNodes);
+        callout.append(title, body);
+        quote.replaceWith(callout);
+      }
+
+      for (const checkbox of article.querySelectorAll('li input[type="checkbox"]')) {
+        const item = checkbox.closest('li');
+        if (checkbox.parentElement !== item && checkbox.parentElement.parentElement !== item) continue;
+        item.classList.add('task-item');
+        item.classList.toggle('task-completed', checkbox.checked);
+        const label = document.createElement('span');
+        label.className = 'task-label';
+        checkbox.after(label);
+        while (label.nextSibling && !['UL', 'OL'].includes(label.nextSibling.nodeName)) {
+          label.append(label.nextSibling);
+        }
+        checkbox.setAttribute('aria-label', label.textContent.trim());
+      }
+
+      let foldedCallouts = [];
+      window.addEventListener('beforeprint', () => {
+        foldedCallouts = [...article.querySelectorAll('details.callout:not([open])')];
+        foldedCallouts.forEach(callout => { callout.open = true; });
+      });
+      window.addEventListener('afterprint', () => {
+        foldedCallouts.forEach(callout => { callout.open = false; });
+        foldedCallouts = [];
       });
 
       const slugCounts = new Map();
@@ -366,7 +471,7 @@
           '--bg': '#ffffff', '--surface-strong': '#f1f5f9', '--ink': '#111827',
           '--muted': '#475569', '--accent': '#075985', '--mermaid-primary': '#f8fafc'
         };
-        const color = name => renderingPDF ? printPalette[name] : palette.getPropertyValue(name).trim();
+        const color = name => renderingForPrint ? printPalette[name] : palette.getPropertyValue(name).trim();
         try {
           mermaid.initialize({
             startOnLoad: false,
@@ -402,35 +507,28 @@
         await renderMermaid();
       }
 
-      window.addEventListener('load', async () => {
+      // Start diagrams immediately; keep local images available until load finishes.
+      const assetsLoaded = new Promise(resolve => {
+        if (document.readyState === 'complete') resolve();
+        else window.addEventListener('load', resolve, { once: true });
+      });
+      (async () => {
         try {
           await prepare();
-          if (renderingPDF) return;
-
-          const response = await fetch(`/${token}/pdf`, {
-            headers: { 'X-MDO-Token': token },
-          });
-          if (!response.ok) throw new Error(`PDF: ${response.status}`);
-          pdfBlob = await response.blob();
-          documentReady = true;
-          pdfButton.textContent = 'Download PDF';
-          pdfButton.title = 'Download PDF with navigation bookmarks';
-          pdfButton.disabled = false;
-        }
-        catch (error) {
-          console.error('mdo: could not prepare PDF', error);
-          pdfButton.textContent = 'PDF unavailable';
-          pdfButton.title = 'Could not generate PDF';
+        } catch (error) {
+          console.error('mdo: could not prepare diagrams', error);
         } finally {
+          await assetsLoaded;
+          documentReady = true;
+          pdfButton.disabled = false;
           window.mdoReady = true;
-          if (renderingPDF) return;
           fetch(`/${token}/ready`, {
             method: 'POST',
             headers: { 'X-MDO-Token': token },
             keepalive: true
           }).catch(() => {});
         }
-      });
+      })();
     })();
   </script>
 </body>
