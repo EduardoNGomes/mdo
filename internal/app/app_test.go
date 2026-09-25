@@ -401,3 +401,77 @@ func TestBrowserThemeSelection(t *testing.T) {
 		t.Errorf("components requested external assets: %v", externalRequests)
 	}
 }
+
+func TestBrowserMarkdownEnhancements(t *testing.T) {
+	if os.Getenv("CI") != "" || !chromeAvailable() {
+		t.Skip("headless Chrome is unavailable")
+	}
+	source := "> [!NOTE]+ **TODO**\n> Migrate tasks here?\n\n> [!WARNING]- Careful\n> Hidden body\n>\n> > [!TIP]\n> > Nested body\n\n- [x] Parent **done**\n    - [ ] Child pending\n- [ ] Pending\n\n> Normal quote\n\n```text\n[!NOTE] not a callout\n```\n\n| A | B |\n| - | - |\n| one | ~~two~~ |\n"
+	content, err := document.Render([]byte(source))
+	if err != nil {
+		t.Fatal(err)
+	}
+	html, err := web.Page(web.PageData{Title: "Markdown", Content: content, Token: "test", Theme: "default"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		setSecurityHeaders(w)
+		w.Header().Set("Content-Type", "text/html")
+		w.Write(html)
+	}))
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	ctx, closeBrowser := chromedp.NewContext(ctx)
+	defer closeBrowser()
+	var state struct {
+		Callouts    int
+		Open        bool
+		Closed      bool
+		Body        bool
+		Bold        bool
+		Nested      bool
+		Tasks       int
+		Completed   int
+		ChildStyle  string
+		ParentStyle string
+		Quote       bool
+		Code        bool
+		Table       bool
+		PrintOpen   bool
+		Restored    bool
+		Keyboard    bool
+	}
+	if err := chromedp.Run(ctx,
+		chromedp.Navigate(server.URL), chromedp.Poll(`window.mdoReady === true`, nil),
+		chromedp.Evaluate(`(() => {
+		 const article = document.querySelector('article');
+		 const first = article.querySelector('.callout');
+		 const folded = article.querySelector('details:not([open])');
+		 const tasks = article.querySelectorAll('.task-item');
+		 const state = {Callouts:article.querySelectorAll('.callout').length, Open:first.open, Closed:!folded.open,
+		 Body:first.querySelector('.callout-body').textContent.trim() === 'Migrate tasks here?', Bold:first.querySelector('.callout-title strong').textContent === 'TODO',
+		 Nested:!!folded.querySelector('.callout-success'), Tasks:tasks.length, Completed:article.querySelectorAll('.task-completed').length,
+		 ChildStyle:getComputedStyle(tasks[1].querySelector('.task-label')).textDecorationLine,
+		 ParentStyle:getComputedStyle(tasks[0].querySelector('.task-label')).textDecorationLine,
+		 Quote:article.querySelector('blockquote').textContent.trim() === 'Normal quote',
+		 Code:article.querySelector('pre code').textContent.includes('[!NOTE] not a callout'), Table:!!article.querySelector('table del')};
+		 window.dispatchEvent(new Event('beforeprint')); state.PrintOpen=folded.open;
+		 window.dispatchEvent(new Event('afterprint')); state.Restored=!folded.open && first.open;
+		 folded.querySelector('summary').focus();
+		 return state;
+		})()`, &state),
+		chromedp.KeyEvent(kb.Enter),
+		chromedp.Evaluate(`document.querySelector('details.callout-warning').open`, &state.Keyboard),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if state.Callouts != 3 || !state.Open || !state.Closed || !state.Body || !state.Bold || !state.Nested || state.Tasks != 3 || state.Completed != 1 || state.ChildStyle != "none" || state.ParentStyle != "line-through" || !state.Quote || !state.Code || !state.Table || !state.PrintOpen || !state.Restored || !state.Keyboard {
+		t.Fatalf("Markdown state: %+v", state)
+	}
+}

@@ -77,6 +77,8 @@ continues to run only on localhost and does not look for or require ngrok.
 
 - CommonMark and GitHub Flavored Markdown
 - tables, task lists, autolinks, and strikethrough text
+- nested task lists with completed labels struck through
+- GitHub-style alerts and Obsidian-style callouts, including foldable titles
 - footnotes and definition lists
 - syntax highlighting
 - table of contents and heading links
