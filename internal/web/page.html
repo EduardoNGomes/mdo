@@ -48,8 +48,8 @@
   </div>
 
   <wa-toast class="theme-toast" placement="bottom-end"></wa-toast>
-  <script>if (!new URLSearchParams(location.search).has('pdf')) { {{.Components}} }</script>
-  <script>{{.Mermaid}}</script>
+  <script>{{.Components}}</script>
+  {{if .Mermaid}}<script>{{.Mermaid}}</script>{{end}}
   <script>
     (() => {
       const token = {{.Token}};
